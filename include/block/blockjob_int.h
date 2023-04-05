@@ -27,6 +27,7 @@
 #define BLOCKJOB_INT_H
 
 #include "block/blockjob.h"
+#include "block/block.h"
 
 /**
  * BlockJobDriver:

@@ -34,7 +34,6 @@
 #endif
 
 #include "qcow2.h"
-#include "block/block-io.h"
 #include "block/thread-pool.h"
 #include "crypto.h"
 

@@ -118,9 +118,6 @@ void pci_data_write(PCIBus *s, uint32_t addr, uint32_t val, unsigned len)
     uint32_t config_addr = addr & (PCI_CONFIG_SPACE_SIZE - 1);
 
     if (!pci_dev) {
-        trace_pci_cfg_write("empty", extract32(addr, 16, 8),
-                            extract32(addr, 11, 5), extract32(addr, 8, 3),
-                            config_addr, val);
         return;
     }
 
@@ -134,9 +131,6 @@ uint32_t pci_data_read(PCIBus *s, uint32_t addr, unsigned len)
     uint32_t config_addr = addr & (PCI_CONFIG_SPACE_SIZE - 1);
 
     if (!pci_dev) {
-        trace_pci_cfg_read("empty", extract32(addr, 16, 8),
-                           extract32(addr, 11, 5), extract32(addr, 8, 3),
-                           config_addr, ~0x0);
         return ~0x0;
     }
 
@@ -149,7 +143,7 @@ static void pci_host_config_write(void *opaque, hwaddr addr,
 {
     PCIHostState *s = opaque;
 
-    PCI_DPRINTF("%s addr " HWADDR_FMT_plx " len %d val %"PRIx64"\n",
+    PCI_DPRINTF("%s addr " TARGET_FMT_plx " len %d val %"PRIx64"\n",
                 __func__, addr, len, val);
     if (addr != 0 || len != 4) {
         return;
@@ -163,7 +157,7 @@ static uint64_t pci_host_config_read(void *opaque, hwaddr addr,
     PCIHostState *s = opaque;
     uint32_t val = s->config_reg;
 
-    PCI_DPRINTF("%s addr " HWADDR_FMT_plx " len %d val %"PRIx32"\n",
+    PCI_DPRINTF("%s addr " TARGET_FMT_plx " len %d val %"PRIx32"\n",
                 __func__, addr, len, val);
     return val;
 }

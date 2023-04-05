@@ -43,7 +43,7 @@ void aarch64_cpu_register(const ARMCPUInfo *info);
 /**
  * ARMCPUClass:
  * @parent_realize: The parent class' realize handler.
- * @parent_phases: The parent class' reset phase handlers.
+ * @parent_reset: The parent class' reset handler.
  *
  * An ARM CPU model.
  */
@@ -54,7 +54,7 @@ struct ARMCPUClass {
 
     const ARMCPUInfo *info;
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
 };
 
 

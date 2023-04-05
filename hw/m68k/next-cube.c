@@ -24,7 +24,6 @@
 #include "hw/block/fdc.h"
 #include "hw/qdev-properties.h"
 #include "qapi/error.h"
-#include "qemu/error-report.h"
 #include "ui/console.h"
 #include "target/m68k/cpu.h"
 #include "migration/vmstate.h"

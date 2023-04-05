@@ -21,7 +21,6 @@ from typing import (
     TYPE_CHECKING,
     Dict,
     List,
-    Mapping,
     Optional,
     Set,
     Union,
@@ -38,19 +37,15 @@ if TYPE_CHECKING:
     from .schema import QAPISchemaFeature, QAPISchemaMember
 
 
+#: Represents a single Top Level QAPI schema expression.
+TopLevelExpr = Dict[str, object]
+
 # Return value alias for get_expr().
 _ExprValue = Union[List[object], Dict[str, object], str, bool]
 
-
-class QAPIExpression(Dict[str, object]):
-    # pylint: disable=too-few-public-methods
-    def __init__(self,
-                 data: Mapping[str, object],
-                 info: QAPISourceInfo,
-                 doc: Optional['QAPIDoc'] = None):
-        super().__init__(data)
-        self.info = info
-        self.doc: Optional['QAPIDoc'] = doc
+# FIXME: Consolidate and centralize definitions for TopLevelExpr,
+# _ExprValue, _JSONValue, and _JSONObject; currently scattered across
+# several modules.
 
 
 class QAPIParseError(QAPISourceError):
@@ -105,7 +100,7 @@ class QAPISchemaParser:
         self.line_pos = 0
 
         # Parser output:
-        self.exprs: List[QAPIExpression] = []
+        self.exprs: List[Dict[str, object]] = []
         self.docs: List[QAPIDoc] = []
 
         # Showtime!
@@ -152,7 +147,8 @@ class QAPISchemaParser:
                                        "value of 'include' must be a string")
                 incl_fname = os.path.join(os.path.dirname(self._fname),
                                           include)
-                self._add_expr(OrderedDict({'include': incl_fname}), info)
+                self.exprs.append({'expr': {'include': incl_fname},
+                                   'info': info})
                 exprs_include = self._include(include, info, incl_fname,
                                               self._included)
                 if exprs_include:
@@ -169,17 +165,16 @@ class QAPISchemaParser:
                 for name, value in pragma.items():
                     self._pragma(name, value, info)
             else:
-                if cur_doc and not cur_doc.symbol:
-                    raise QAPISemError(
-                        cur_doc.info, "definition documentation required")
-                self._add_expr(expr, info, cur_doc)
+                expr_elem = {'expr': expr,
+                             'info': info}
+                if cur_doc:
+                    if not cur_doc.symbol:
+                        raise QAPISemError(
+                            cur_doc.info, "definition documentation required")
+                    expr_elem['doc'] = cur_doc
+                self.exprs.append(expr_elem)
             cur_doc = None
         self.reject_expr_doc(cur_doc)
-
-    def _add_expr(self, expr: Mapping[str, object],
-                  info: QAPISourceInfo,
-                  doc: Optional['QAPIDoc'] = None) -> None:
-        self.exprs.append(QAPIExpression(expr, info, doc))
 
     @staticmethod
     def reject_expr_doc(doc: Optional['QAPIDoc']) -> None:
@@ -789,7 +784,7 @@ class QAPIDoc:
                                % feature.name)
         self.features[feature.name].connect(feature)
 
-    def check_expr(self, expr: QAPIExpression) -> None:
+    def check_expr(self, expr: TopLevelExpr) -> None:
         if self.has_section('Returns') and 'command' not in expr:
             raise QAPISemError(self.info,
                                "'Returns:' is only valid for commands")

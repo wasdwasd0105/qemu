@@ -9,7 +9,6 @@ are only implementing things for HW accelerated hypervisors.
    :maxdepth: 2
 
    tcg
-   tcg-ops
    decodetree
    multi-thread-tcg
    tcg-icount

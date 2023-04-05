@@ -15,6 +15,7 @@
 #include "migration/vmstate.h"
 #include "net/net.h"
 #include "net/eth.h"
+#include "hw/hw.h"
 #include "hw/irq.h"
 #include "hw/net/lan9118.h"
 #include "hw/ptimer.h"
@@ -31,8 +32,12 @@
 #ifdef DEBUG_LAN9118
 #define DPRINTF(fmt, ...) \
 do { printf("lan9118: " fmt , ## __VA_ARGS__); } while (0)
+#define BADF(fmt, ...) \
+do { hw_error("lan9118: error: " fmt , ## __VA_ARGS__);} while (0)
 #else
 #define DPRINTF(fmt, ...) do {} while(0)
+#define BADF(fmt, ...) \
+do { fprintf(stderr, "lan9118: error: " fmt , ## __VA_ARGS__);} while (0)
 #endif
 
 /* The tx and rx fifo ports are a range of aliased 32-bit registers */
@@ -843,8 +848,7 @@ static uint32_t do_phy_read(lan9118_state *s, int reg)
     case 30: /* Interrupt mask */
         return s->phy_int_mask;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "do_phy_read: PHY read reg %d\n", reg);
+        BADF("PHY read reg %d\n", reg);
         return 0;
     }
 }
@@ -872,8 +876,7 @@ static void do_phy_write(lan9118_state *s, int reg, uint32_t val)
         phy_update_irq(s);
         break;
     default:
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "do_phy_write: PHY write reg %d = 0x%04x\n", reg, val);
+        BADF("PHY write reg %d = 0x%04x\n", reg, val);
     }
 }
 
@@ -1206,8 +1209,7 @@ static void lan9118_16bit_mode_write(void *opaque, hwaddr offset,
         return;
     }
 
-    qemu_log_mask(LOG_GUEST_ERROR,
-                  "lan9118_16bit_mode_write: Bad size 0x%x\n", size);
+    hw_error("lan9118_write: Bad size 0x%x\n", size);
 }
 
 static uint64_t lan9118_readl(void *opaque, hwaddr offset,
@@ -1322,8 +1324,7 @@ static uint64_t lan9118_16bit_mode_read(void *opaque, hwaddr offset,
         return lan9118_readl(opaque, offset, size);
     }
 
-    qemu_log_mask(LOG_GUEST_ERROR,
-                  "lan9118_16bit_mode_read: Bad size 0x%x\n", size);
+    hw_error("lan9118_read: Bad size 0x%x\n", size);
     return 0;
 }
 

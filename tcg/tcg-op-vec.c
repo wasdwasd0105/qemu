@@ -19,11 +19,8 @@
 
 #include "qemu/osdep.h"
 #include "tcg/tcg.h"
-#include "tcg/tcg-temp-internal.h"
 #include "tcg/tcg-op.h"
 #include "tcg/tcg-mo.h"
-#include "tcg-internal.h"
-
 
 /* Reduce the number of ifdefs below.  This assumes that all uses of
    TCGV_HIGH and TCGV_LOW are properly protected by a conditional that
@@ -153,7 +150,7 @@ bool tcg_can_emit_vecop_list(const TCGOpcode *list,
 
 void vec_gen_2(TCGOpcode opc, TCGType type, unsigned vece, TCGArg r, TCGArg a)
 {
-    TCGOp *op = tcg_emit_op(opc, 2);
+    TCGOp *op = tcg_emit_op(opc);
     TCGOP_VECL(op) = type - TCG_TYPE_V64;
     TCGOP_VECE(op) = vece;
     op->args[0] = r;
@@ -163,7 +160,7 @@ void vec_gen_2(TCGOpcode opc, TCGType type, unsigned vece, TCGArg r, TCGArg a)
 void vec_gen_3(TCGOpcode opc, TCGType type, unsigned vece,
                TCGArg r, TCGArg a, TCGArg b)
 {
-    TCGOp *op = tcg_emit_op(opc, 3);
+    TCGOp *op = tcg_emit_op(opc);
     TCGOP_VECL(op) = type - TCG_TYPE_V64;
     TCGOP_VECE(op) = vece;
     op->args[0] = r;
@@ -174,7 +171,7 @@ void vec_gen_3(TCGOpcode opc, TCGType type, unsigned vece,
 void vec_gen_4(TCGOpcode opc, TCGType type, unsigned vece,
                TCGArg r, TCGArg a, TCGArg b, TCGArg c)
 {
-    TCGOp *op = tcg_emit_op(opc, 4);
+    TCGOp *op = tcg_emit_op(opc);
     TCGOP_VECL(op) = type - TCG_TYPE_V64;
     TCGOP_VECE(op) = vece;
     op->args[0] = r;
@@ -186,7 +183,7 @@ void vec_gen_4(TCGOpcode opc, TCGType type, unsigned vece,
 static void vec_gen_6(TCGOpcode opc, TCGType type, unsigned vece, TCGArg r,
                       TCGArg a, TCGArg b, TCGArg c, TCGArg d, TCGArg e)
 {
-    TCGOp *op = tcg_emit_op(opc, 6);
+    TCGOp *op = tcg_emit_op(opc);
     TCGOP_VECL(op) = type - TCG_TYPE_V64;
     TCGOP_VECE(op) = vece;
     op->args[0] = r;
@@ -227,6 +224,32 @@ void tcg_gen_mov_vec(TCGv_vec r, TCGv_vec a)
     if (r != a) {
         vec_gen_op2(INDEX_op_mov_vec, 0, r, a);
     }
+}
+
+TCGv_vec tcg_const_zeros_vec(TCGType type)
+{
+    TCGv_vec ret = tcg_temp_new_vec(type);
+    tcg_gen_dupi_vec(MO_64, ret, 0);
+    return ret;
+}
+
+TCGv_vec tcg_const_ones_vec(TCGType type)
+{
+    TCGv_vec ret = tcg_temp_new_vec(type);
+    tcg_gen_dupi_vec(MO_64, ret, -1);
+    return ret;
+}
+
+TCGv_vec tcg_const_zeros_vec_matching(TCGv_vec m)
+{
+    TCGTemp *t = tcgv_vec_temp(m);
+    return tcg_const_zeros_vec(t->base_type);
+}
+
+TCGv_vec tcg_const_ones_vec_matching(TCGv_vec m)
+{
+    TCGTemp *t = tcgv_vec_temp(m);
+    return tcg_const_ones_vec(t->base_type);
 }
 
 void tcg_gen_dupi_vec(unsigned vece, TCGv_vec r, uint64_t a)
@@ -405,7 +428,9 @@ void tcg_gen_not_vec(unsigned vece, TCGv_vec r, TCGv_vec a)
     const TCGOpcode *hold_list = tcg_swap_vecop_list(NULL);
 
     if (!TCG_TARGET_HAS_not_vec || !do_op2(vece, r, a, INDEX_op_not_vec)) {
-        tcg_gen_xor_vec(0, r, a, tcg_constant_vec_matching(r, 0, -1));
+        TCGv_vec t = tcg_const_ones_vec_matching(r);
+        tcg_gen_xor_vec(0, r, a, t);
+        tcg_temp_free_vec(t);
     }
     tcg_swap_vecop_list(hold_list);
 }
@@ -418,7 +443,9 @@ void tcg_gen_neg_vec(unsigned vece, TCGv_vec r, TCGv_vec a)
     hold_list = tcg_swap_vecop_list(NULL);
 
     if (!TCG_TARGET_HAS_neg_vec || !do_op2(vece, r, a, INDEX_op_neg_vec)) {
-        tcg_gen_sub_vec(vece, r, tcg_constant_vec_matching(r, vece, 0), a);
+        TCGv_vec t = tcg_const_zeros_vec_matching(r);
+        tcg_gen_sub_vec(vece, r, t, a);
+        tcg_temp_free_vec(t);
     }
     tcg_swap_vecop_list(hold_list);
 }

@@ -49,7 +49,6 @@ Supported devices
  * SMBus controller (SMBF)
  * Ethernet controller (EMC)
  * Tachometer
- * Peripheral SPI controller (PSPI)
 
 Missing devices
 ---------------
@@ -65,6 +64,7 @@ Missing devices
 
  * Ethernet controller (GMAC)
  * USB device (USBD)
+ * Peripheral SPI controller (PSPI)
  * SD/MMC host
  * PECI interface
  * PCI and PCIe root complex and bridges

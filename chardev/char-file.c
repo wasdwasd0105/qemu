@@ -45,7 +45,7 @@ static void qmp_chardev_open_file(Chardev *chr,
     DWORD accessmode;
     DWORD flags;
 
-    if (file->in) {
+    if (file->has_in) {
         error_setg(errp, "input file not supported");
         return;
     }
@@ -83,7 +83,7 @@ static void qmp_chardev_open_file(Chardev *chr,
         return;
     }
 
-    if (file->in) {
+    if (file->has_in) {
         flags = O_RDONLY;
         in = qmp_chardev_open_file_source(file->in, flags, errp);
         if (in < 0) {

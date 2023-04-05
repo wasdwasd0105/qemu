@@ -1,9 +1,7 @@
-sysprof = dependency('sysprof-capture-4', required: false)
-
 stress = executable(
   'stress',
   files('stress.c'),
-  dependencies: [glib, sysprof],
+  dependencies: [glib],
   link_args: ['-static'],
   build_by_default: false,
 )

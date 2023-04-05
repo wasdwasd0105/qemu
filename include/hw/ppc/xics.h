@@ -95,7 +95,7 @@ struct ICSStateClass {
     DeviceClass parent_class;
 
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
 
     void (*reject)(ICSState *s, uint32_t irq);
     void (*resend)(ICSState *s);

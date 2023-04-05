@@ -49,7 +49,11 @@ static bool trans_mult_acc(DisasContext *ctx, arg_r *a,
     gen_helper_mult_acc(t0, cpu_env, t0, t1);
 
     gen_store_gpr(t0, a->rd);
-    return true;
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return false;
 }
 
 TRANS(MACC,     trans_mult_acc, gen_helper_macc);

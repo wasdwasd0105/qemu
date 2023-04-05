@@ -21,6 +21,7 @@
 #define HW_I386_X86_IOMMU_H
 
 #include "hw/sysbus.h"
+#include "hw/pci/pci.h"
 #include "hw/pci/msi.h"
 #include "qom/object.h"
 

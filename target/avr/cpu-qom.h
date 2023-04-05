@@ -31,7 +31,7 @@ OBJECT_DECLARE_CPU_TYPE(AVRCPU, AVRCPUClass, AVR_CPU)
 /**
  *  AVRCPUClass:
  *  @parent_realize: The parent class' realize handler.
- *  @parent_phases: The parent class' reset phase handlers.
+ *  @parent_reset: The parent class' reset handler.
  *
  *  A AVR CPU model.
  */
@@ -40,7 +40,7 @@ struct AVRCPUClass {
     CPUClass parent_class;
     /*< public >*/
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
 };
 
 

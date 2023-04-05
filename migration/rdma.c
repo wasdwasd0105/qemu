@@ -2785,8 +2785,7 @@ static ssize_t qio_channel_rdma_writev(QIOChannel *ioc,
     rdma = qatomic_rcu_read(&rioc->rdmaout);
 
     if (!rdma) {
-        error_setg(errp, "RDMA control channel output is not set");
-        return -1;
+        return -EIO;
     }
 
     CHECK_ERROR_STATE();
@@ -2798,8 +2797,7 @@ static ssize_t qio_channel_rdma_writev(QIOChannel *ioc,
     ret = qemu_rdma_write_flush(f, rdma);
     if (ret < 0) {
         rdma->error_state = ret;
-        error_setg(errp, "qemu_rdma_write_flush returned %d", ret);
-        return -1;
+        return ret;
     }
 
     for (i = 0; i < niov; i++) {
@@ -2818,8 +2816,7 @@ static ssize_t qio_channel_rdma_writev(QIOChannel *ioc,
 
             if (ret < 0) {
                 rdma->error_state = ret;
-                error_setg(errp, "qemu_rdma_exchange_send returned %d", ret);
-                return -1;
+                return ret;
             }
 
             data += len;
@@ -2857,7 +2854,6 @@ static ssize_t qio_channel_rdma_readv(QIOChannel *ioc,
                                       size_t niov,
                                       int **fds,
                                       size_t *nfds,
-                                      int flags,
                                       Error **errp)
 {
     QIOChannelRDMA *rioc = QIO_CHANNEL_RDMA(ioc);
@@ -2871,8 +2867,7 @@ static ssize_t qio_channel_rdma_readv(QIOChannel *ioc,
     rdma = qatomic_rcu_read(&rioc->rdmain);
 
     if (!rdma) {
-        error_setg(errp, "RDMA control channel input is not set");
-        return -1;
+        return -EIO;
     }
 
     CHECK_ERROR_STATE();
@@ -2908,8 +2903,7 @@ static ssize_t qio_channel_rdma_readv(QIOChannel *ioc,
 
         if (ret < 0) {
             rdma->error_state = ret;
-            error_setg(errp, "qemu_rdma_exchange_recv returned %d", ret);
-            return -1;
+            return ret;
         }
 
         /*
@@ -3373,8 +3367,7 @@ static int qemu_rdma_accept(RDMAContext *rdma)
      * initialize the RDMAContext for return path for postcopy after first
      * connection request reached.
      */
-    if ((migrate_postcopy() || migrate_use_return_path())
-        && !rdma->is_return_path) {
+    if (migrate_postcopy() && !rdma->is_return_path) {
         rdma_return_path = qemu_rdma_data_init(rdma->host_port, NULL);
         if (rdma_return_path == NULL) {
             rdma_ack_cm_event(cm_event);
@@ -3456,8 +3449,7 @@ static int qemu_rdma_accept(RDMAContext *rdma)
     }
 
     /* Accept the second connection request for return path */
-    if ((migrate_postcopy() || migrate_use_return_path())
-        && !rdma->is_return_path) {
+    if (migrate_postcopy() && !rdma->is_return_path) {
         qemu_set_fd_handler(rdma->channel->fd, rdma_accept_incoming_migration,
                             NULL,
                             (void *)(intptr_t)rdma->return_path);
@@ -4111,7 +4103,7 @@ static void rdma_accept_incoming_migration(void *opaque)
 void rdma_start_incoming_migration(const char *host_port, Error **errp)
 {
     int ret;
-    RDMAContext *rdma;
+    RDMAContext *rdma, *rdma_return_path = NULL;
     Error *local_err = NULL;
 
     trace_rdma_start_incoming_migration();
@@ -4157,6 +4149,7 @@ err:
         g_free(rdma->host_port);
     }
     g_free(rdma);
+    g_free(rdma_return_path);
 }
 
 void rdma_start_outgoing_migration(void *opaque,
@@ -4193,7 +4186,7 @@ void rdma_start_outgoing_migration(void *opaque,
     }
 
     /* RDMA postcopy need a separate queue pair for return path */
-    if (migrate_postcopy() || migrate_use_return_path()) {
+    if (migrate_postcopy()) {
         rdma_return_path = qemu_rdma_data_init(host_port, errp);
 
         if (rdma_return_path == NULL) {

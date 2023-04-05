@@ -28,6 +28,7 @@ blobs = [
   'bios-256k.bin',
   'bios-microvm.bin',
   'qboot.rom',
+  'sgabios.bin',
   'vgabios.bin',
   'vgabios-cirrus.bin',
   'vgabios-stdvga.bin',

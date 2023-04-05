@@ -41,7 +41,7 @@ typedef struct XtensaConfig XtensaConfig;
 /**
  * XtensaCPUClass:
  * @parent_realize: The parent class' realize handler.
- * @parent_phases: The parent class' reset phase handlers.
+ * @parent_reset: The parent class' reset handler.
  * @config: The CPU core configuration.
  *
  * An Xtensa CPU model.
@@ -52,7 +52,7 @@ struct XtensaCPUClass {
     /*< public >*/
 
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
 
     const XtensaConfig *config;
 };

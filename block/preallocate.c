@@ -30,7 +30,6 @@
 #include "qemu/module.h"
 #include "qemu/option.h"
 #include "qemu/units.h"
-#include "block/block-io.h"
 #include "block/block_int.h"
 
 
@@ -226,17 +225,16 @@ static void preallocate_reopen_abort(BDRVReopenState *state)
     state->opaque = NULL;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-preallocate_co_preadv_part(BlockDriverState *bs, int64_t offset, int64_t bytes,
-                           QEMUIOVector *qiov, size_t qiov_offset,
-                           BdrvRequestFlags flags)
+static coroutine_fn int preallocate_co_preadv_part(
+        BlockDriverState *bs, int64_t offset, int64_t bytes,
+        QEMUIOVector *qiov, size_t qiov_offset, BdrvRequestFlags flags)
 {
     return bdrv_co_preadv_part(bs->file, offset, bytes, qiov, qiov_offset,
                                flags);
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-preallocate_co_pdiscard(BlockDriverState *bs, int64_t offset, int64_t bytes)
+static int coroutine_fn preallocate_co_pdiscard(BlockDriverState *bs,
+                                               int64_t offset, int64_t bytes)
 {
     return bdrv_co_pdiscard(bs->file, offset, bytes);
 }
@@ -270,9 +268,8 @@ static bool has_prealloc_perms(BlockDriverState *bs)
  * want_merge_zero is used to merge write-zero request with preallocation in
  * one bdrv_co_pwrite_zeroes() call.
  */
-static bool coroutine_fn GRAPH_RDLOCK
-handle_write(BlockDriverState *bs, int64_t offset, int64_t bytes,
-             bool want_merge_zero)
+static bool coroutine_fn handle_write(BlockDriverState *bs, int64_t offset,
+                                      int64_t bytes, bool want_merge_zero)
 {
     BDRVPreallocateState *s = bs->opaque;
     int64_t end = offset + bytes;
@@ -289,7 +286,7 @@ handle_write(BlockDriverState *bs, int64_t offset, int64_t bytes,
     }
 
     if (s->data_end < 0) {
-        s->data_end = bdrv_co_getlength(bs->file->bs);
+        s->data_end = bdrv_getlength(bs->file->bs);
         if (s->data_end < 0) {
             return false;
         }
@@ -311,7 +308,7 @@ handle_write(BlockDriverState *bs, int64_t offset, int64_t bytes,
     }
 
     if (s->file_end < 0) {
-        s->file_end = bdrv_co_getlength(bs->file->bs);
+        s->file_end = bdrv_getlength(bs->file->bs);
         if (s->file_end < 0) {
             return false;
         }
@@ -347,9 +344,8 @@ handle_write(BlockDriverState *bs, int64_t offset, int64_t bytes,
     return want_merge_zero;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-preallocate_co_pwrite_zeroes(BlockDriverState *bs, int64_t offset,
-                             int64_t bytes, BdrvRequestFlags flags)
+static int coroutine_fn preallocate_co_pwrite_zeroes(BlockDriverState *bs,
+        int64_t offset, int64_t bytes, BdrvRequestFlags flags)
 {
     bool want_merge_zero =
         !(flags & ~(BDRV_REQ_ZERO_WRITE | BDRV_REQ_NO_FALLBACK));
@@ -360,10 +356,12 @@ preallocate_co_pwrite_zeroes(BlockDriverState *bs, int64_t offset,
     return bdrv_co_pwrite_zeroes(bs->file, offset, bytes, flags);
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-preallocate_co_pwritev_part(BlockDriverState *bs, int64_t offset, int64_t bytes,
-                            QEMUIOVector *qiov, size_t qiov_offset,
-                            BdrvRequestFlags flags)
+static coroutine_fn int preallocate_co_pwritev_part(BlockDriverState *bs,
+                                                    int64_t offset,
+                                                    int64_t bytes,
+                                                    QEMUIOVector *qiov,
+                                                    size_t qiov_offset,
+                                                    BdrvRequestFlags flags)
 {
     handle_write(bs, offset, bytes, false);
 
@@ -371,7 +369,7 @@ preallocate_co_pwritev_part(BlockDriverState *bs, int64_t offset, int64_t bytes,
                                 flags);
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 preallocate_co_truncate(BlockDriverState *bs, int64_t offset,
                         bool exact, PreallocMode prealloc,
                         BdrvRequestFlags flags, Error **errp)
@@ -382,7 +380,7 @@ preallocate_co_truncate(BlockDriverState *bs, int64_t offset,
 
     if (s->data_end >= 0 && offset > s->data_end) {
         if (s->file_end < 0) {
-            s->file_end = bdrv_co_getlength(bs->file->bs);
+            s->file_end = bdrv_getlength(bs->file->bs);
             if (s->file_end < 0) {
                 error_setg(errp, "failed to get file length");
                 return s->file_end;
@@ -438,13 +436,12 @@ preallocate_co_truncate(BlockDriverState *bs, int64_t offset,
     return 0;
 }
 
-static int coroutine_fn GRAPH_RDLOCK preallocate_co_flush(BlockDriverState *bs)
+static int coroutine_fn preallocate_co_flush(BlockDriverState *bs)
 {
     return bdrv_co_flush(bs->file->bs);
 }
 
-static int64_t coroutine_fn GRAPH_RDLOCK
-preallocate_co_getlength(BlockDriverState *bs)
+static int64_t preallocate_getlength(BlockDriverState *bs)
 {
     int64_t ret;
     BDRVPreallocateState *s = bs->opaque;
@@ -453,7 +450,7 @@ preallocate_co_getlength(BlockDriverState *bs)
         return s->data_end;
     }
 
-    ret = bdrv_co_getlength(bs->file->bs);
+    ret = bdrv_getlength(bs->file->bs);
 
     if (has_prealloc_perms(bs)) {
         s->file_end = s->zero_start = s->data_end = ret;
@@ -539,9 +536,9 @@ BlockDriver bdrv_preallocate_filter = {
     .format_name = "preallocate",
     .instance_size = sizeof(BDRVPreallocateState),
 
-    .bdrv_co_getlength    = preallocate_co_getlength,
-    .bdrv_open            = preallocate_open,
-    .bdrv_close           = preallocate_close,
+    .bdrv_getlength = preallocate_getlength,
+    .bdrv_open = preallocate_open,
+    .bdrv_close = preallocate_close,
 
     .bdrv_reopen_prepare  = preallocate_reopen_prepare,
     .bdrv_reopen_commit   = preallocate_reopen_commit,

@@ -24,6 +24,7 @@
 #include "qapi/qmp/qjson.h"
 #include "guest-agent-core.h"
 #include "qga-qapi-init-commands.h"
+#include "qapi/qmp/qerror.h"
 #include "qapi/error.h"
 #include "channel.h"
 #include "qemu/cutils.h"
@@ -39,11 +40,11 @@
 #include "commands-common.h"
 
 #ifndef _WIN32
-#ifdef CONFIG_BSD
+#ifdef __FreeBSD__
 #define QGA_VIRTIO_PATH_DEFAULT "/dev/vtcon/org.qemu.guest_agent.0"
-#else /* CONFIG_BSD */
+#else /* __FreeBSD__ */
 #define QGA_VIRTIO_PATH_DEFAULT "/dev/virtio-ports/org.qemu.guest_agent.0"
-#endif /* CONFIG_BSD */
+#endif /* __FreeBSD__ */
 #define QGA_SERIAL_PATH_DEFAULT "/dev/ttyS0"
 #define QGA_STATE_RELATIVE_DIR  "run"
 #else
@@ -82,7 +83,6 @@ struct GAState {
 #ifdef _WIN32
     GAService service;
     HANDLE wakeup_event;
-    HANDLE event_log;
 #endif
     bool delimit_response;
     bool frozen;
@@ -313,38 +313,6 @@ void ga_enable_logging(GAState *s)
     s->logging_enabled = true;
 }
 
-static int glib_log_level_to_system(int level)
-{
-    switch (level) {
-#ifndef _WIN32
-    case G_LOG_LEVEL_ERROR:
-        return LOG_ERR;
-    case G_LOG_LEVEL_CRITICAL:
-        return LOG_CRIT;
-    case G_LOG_LEVEL_WARNING:
-        return LOG_WARNING;
-    case G_LOG_LEVEL_MESSAGE:
-        return LOG_NOTICE;
-    case G_LOG_LEVEL_DEBUG:
-        return LOG_DEBUG;
-    case G_LOG_LEVEL_INFO:
-    default:
-        return LOG_INFO;
-#else
-    case G_LOG_LEVEL_ERROR:
-    case G_LOG_LEVEL_CRITICAL:
-        return EVENTLOG_ERROR_TYPE;
-    case G_LOG_LEVEL_WARNING:
-        return EVENTLOG_WARNING_TYPE;
-    case G_LOG_LEVEL_MESSAGE:
-    case G_LOG_LEVEL_INFO:
-    case G_LOG_LEVEL_DEBUG:
-    default:
-        return EVENTLOG_INFORMATION_TYPE;
-#endif
-    }
-}
-
 static void ga_log(const gchar *domain, GLogLevelFlags level,
                    const gchar *msg, gpointer opaque)
 {
@@ -356,14 +324,13 @@ static void ga_log(const gchar *domain, GLogLevelFlags level,
     }
 
     level &= G_LOG_LEVEL_MASK;
-    if (g_strcmp0(domain, "syslog") == 0) {
 #ifndef _WIN32
-        syslog(glib_log_level_to_system(level), "%s: %s", level_str, msg);
-#else
-        ReportEvent(s->event_log, glib_log_level_to_system(level),
-                    0, 1, NULL, 1, 0, &msg, NULL);
-#endif
+    if (g_strcmp0(domain, "syslog") == 0) {
+        syslog(LOG_INFO, "%s: %s", level_str, msg);
     } else if (level & s->log_level) {
+#else
+    if (level & s->log_level) {
+#endif
         g_autoptr(GDateTime) now = g_date_time_new_now_utc();
         g_autofree char *nowstr = g_date_time_format(now, "%s.%f");
         fprintf(s->log_file, "%s: %s: %s\n", nowstr, level_str, msg);
@@ -1319,13 +1286,6 @@ static GAState *initialize_agent(GAConfig *config, int socket_activation)
     g_debug("Guest agent version %s started", QEMU_FULL_VERSION);
 
 #ifdef _WIN32
-    s->event_log = RegisterEventSource(NULL, "qemu-ga");
-    if (!s->event_log) {
-        g_autofree gchar *errmsg = g_win32_error_message(GetLastError());
-        g_critical("unable to register event source: %s", errmsg);
-        return NULL;
-    }
-
     /* On win32 the state directory is application specific (be it the default
      * or a user override). We got past the command line parsing; let's create
      * the directory (with any intermediate directories). If we run into an
@@ -1417,7 +1377,6 @@ static void cleanup_agent(GAState *s)
 {
 #ifdef _WIN32
     CloseHandle(s->wakeup_event);
-    CloseHandle(s->event_log);
 #endif
     if (s->command_state) {
         ga_command_state_cleanup_all(s->command_state);

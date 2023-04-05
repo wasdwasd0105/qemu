@@ -23,7 +23,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/net/mii.h"
 #include "etsec.h"
 #include "registers.h"
 
@@ -141,8 +140,8 @@ void etsec_miim_link_status(eTSEC *etsec, NetClientState *nc)
 {
     /* Set link status */
     if (nc->link_down) {
-        etsec->phy_status &= ~MII_BMSR_LINK_ST;
+        etsec->phy_status &= ~MII_SR_LINK_STATUS;
     } else {
-        etsec->phy_status |= MII_BMSR_LINK_ST;
+        etsec->phy_status |= MII_SR_LINK_STATUS;
     }
 }

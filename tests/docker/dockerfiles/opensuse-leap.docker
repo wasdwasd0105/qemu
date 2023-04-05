@@ -88,16 +88,23 @@ RUN zypper update -y && \
            openssh \
            pam-devel \
            pcre-devel-static \
+           perl-base \
            pkgconfig \
-           python39-base \
-           python39-pip \
-           python39-setuptools \
+           python3-Pillow \
+           python3-PyYAML \
+           python3-Sphinx \
+           python3-base \
+           python3-numpy \
+           python3-opencv \
+           python3-pip \
+           python3-setuptools \
+           python3-sphinx_rtd_theme \
+           python3-wheel \
            rdma-core-devel \
            rpm \
            sed \
            snappy-devel \
            sndio-devel \
-           socat \
            sparse \
            spice-protocol-devel \
            systemd-devel \
@@ -105,6 +112,7 @@ RUN zypper update -y && \
            tar \
            tesseract-ocr \
            tesseract-ocr-traineddata-english \
+           texinfo \
            usbredir-devel \
            util-linux \
            virglrenderer-devel \
@@ -113,8 +121,7 @@ RUN zypper update -y && \
            xen-devel \
            xfsprogs-devel \
            zlib-devel \
-           zlib-devel-static \
-           zstd && \
+           zlib-devel-static && \
     zypper clean --all && \
     rpm -qa | sort > /packages.txt && \
     mkdir -p /usr/libexec/ccache-wrappers && \
@@ -124,20 +131,10 @@ RUN zypper update -y && \
     ln -s /usr/bin/ccache /usr/libexec/ccache-wrappers/g++ && \
     ln -s /usr/bin/ccache /usr/libexec/ccache-wrappers/gcc
 
-RUN /usr/bin/pip3.9 install \
-                    PyYAML \
-                    meson==0.63.2 \
-                    pillow \
-                    sphinx \
-                    sphinx-rtd-theme
+RUN /usr/bin/pip3 install meson==0.56.0
 
 ENV CCACHE_WRAPPERSDIR "/usr/libexec/ccache-wrappers"
 ENV LANG "en_US.UTF-8"
 ENV MAKE "/usr/bin/make"
 ENV NINJA "/usr/bin/ninja"
-ENV PYTHON "/usr/bin/python3.9"
-# As a final step configure the user (if env is defined)
-ARG USER
-ARG UID
-RUN if [ "${USER}" ]; then \
-  id ${USER} 2>/dev/null || useradd -u ${UID} -U ${USER}; fi
+ENV PYTHON "/usr/bin/python3"

@@ -278,16 +278,10 @@
 #          cryptodev-backend and must be 1 for cryptodev-backend-builtin.
 #          (default: 1)
 #
-# @throttle-bps: limit total bytes per second (Since 8.0)
-#
-# @throttle-ops: limit total operations per second (Since 8.0)
-#
 # Since: 2.8
 ##
 { 'struct': 'CryptodevBackendProperties',
-  'data': { '*queues': 'uint32',
-            '*throttle-bps': 'uint64',
-            '*throttle-ops': 'uint64' } }
+  'data': { '*queues': 'uint32' } }
 
 ##
 # @CryptodevVhostUserProperties:

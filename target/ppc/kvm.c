@@ -32,6 +32,7 @@
 #include "sysemu/device_tree.h"
 #include "mmu-hash64.h"
 
+#include "hw/sysbus.h"
 #include "hw/ppc/spapr.h"
 #include "hw/ppc/spapr_cpu_core.h"
 #include "hw/hw.h"

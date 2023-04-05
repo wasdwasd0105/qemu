@@ -8,6 +8,7 @@
  */
 
 #include "qemu/osdep.h"
+#include <string.h>
 #include "hw/i2c/pmbus_device.h"
 #include "hw/irq.h"
 #include "migration/vmstate.h"

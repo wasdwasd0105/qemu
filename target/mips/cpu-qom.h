@@ -34,7 +34,7 @@ OBJECT_DECLARE_CPU_TYPE(MIPSCPU, MIPSCPUClass, MIPS_CPU)
 /**
  * MIPSCPUClass:
  * @parent_realize: The parent class' realize handler.
- * @parent_phases: The parent class' reset phase handlers.
+ * @parent_reset: The parent class' reset handler.
  *
  * A MIPS CPU model.
  */
@@ -44,7 +44,7 @@ struct MIPSCPUClass {
     /*< public >*/
 
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
     const struct mips_def_t *cpu_def;
 
     /* Used for the jazz board to modify mips_cpu_do_transaction_failed. */

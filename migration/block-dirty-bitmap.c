@@ -61,7 +61,6 @@
 #include "qemu/osdep.h"
 #include "block/block.h"
 #include "block/block_int.h"
-#include "block/dirty-bitmap.h"
 #include "sysemu/block-backend.h"
 #include "sysemu/runstate.h"
 #include "qemu/main-loop.h"
@@ -552,7 +551,7 @@ static int add_bitmaps_to_list(DBMSaveState *s, BlockDriverState *bs,
             }
 
             bitmap_alias = bmap_inner->alias;
-            if (bmap_inner->transform) {
+            if (bmap_inner->has_transform) {
                 bitmap_transform = bmap_inner->transform;
             }
         } else {
@@ -762,9 +761,11 @@ static int dirty_bitmap_save_complete(QEMUFile *f, void *opaque)
     return 0;
 }
 
-static void dirty_bitmap_state_pending(void *opaque,
-                                       uint64_t *must_precopy,
-                                       uint64_t *can_postcopy)
+static void dirty_bitmap_save_pending(QEMUFile *f, void *opaque,
+                                      uint64_t max_size,
+                                      uint64_t *res_precopy_only,
+                                      uint64_t *res_compatible,
+                                      uint64_t *res_postcopy_only)
 {
     DBMSaveState *s = &((DBMState *)opaque)->save;
     SaveBitmapState *dbms;
@@ -782,9 +783,9 @@ static void dirty_bitmap_state_pending(void *opaque,
 
     qemu_mutex_unlock_iothread();
 
-    trace_dirty_bitmap_state_pending(pending);
+    trace_dirty_bitmap_save_pending(pending, max_size);
 
-    *can_postcopy += pending;
+    *res_postcopy_only += pending;
 }
 
 /* First occurrence of this bitmap. It should be created if doesn't exist */
@@ -820,7 +821,7 @@ static int dirty_bitmap_load_start(QEMUFile *f, DBMLoadState *s)
     }
 
     if (s->bmap_inner &&
-        s->bmap_inner->transform &&
+        s->bmap_inner->has_transform &&
         s->bmap_inner->transform->has_persistent) {
         persistent = s->bmap_inner->transform->persistent;
     } else {
@@ -1251,8 +1252,7 @@ static SaveVMHandlers savevm_dirty_bitmap_handlers = {
     .save_live_complete_postcopy = dirty_bitmap_save_complete,
     .save_live_complete_precopy = dirty_bitmap_save_complete,
     .has_postcopy = dirty_bitmap_has_postcopy,
-    .state_pending_exact = dirty_bitmap_state_pending,
-    .state_pending_estimate = dirty_bitmap_state_pending,
+    .save_live_pending = dirty_bitmap_save_pending,
     .save_live_iterate = dirty_bitmap_save_iterate,
     .is_active_iterate = dirty_bitmap_is_active_iterate,
     .load_state = dirty_bitmap_load,

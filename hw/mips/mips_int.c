@@ -32,12 +32,17 @@ static void cpu_mips_irq_request(void *opaque, int irq, int level)
     MIPSCPU *cpu = opaque;
     CPUMIPSState *env = &cpu->env;
     CPUState *cs = CPU(cpu);
+    bool locked = false;
 
     if (irq < 0 || irq > 7) {
         return;
     }
 
-    QEMU_IOTHREAD_LOCK_GUARD();
+    /* Make sure locking works even if BQL is already held by the caller */
+    if (!qemu_mutex_iothread_locked()) {
+        locked = true;
+        qemu_mutex_lock_iothread();
+    }
 
     if (level) {
         env->CP0_Cause |= 1 << (irq + CP0Ca_IP);
@@ -53,6 +58,10 @@ static void cpu_mips_irq_request(void *opaque, int irq, int level)
         cpu_interrupt(cs, CPU_INTERRUPT_HARD);
     } else {
         cpu_reset_interrupt(cs, CPU_INTERRUPT_HARD);
+    }
+
+    if (locked) {
+        qemu_mutex_unlock_iothread();
     }
 }
 

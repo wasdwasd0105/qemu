@@ -44,23 +44,13 @@
 #if defined(CONFIG_ATOMIC128)
 static inline Int128 atomic16_cmpxchg(Int128 *ptr, Int128 cmp, Int128 new)
 {
-    Int128Alias r, c, n;
-
-    c.s = cmp;
-    n.s = new;
-    r.i = qatomic_cmpxchg__nocheck((__int128_t *)ptr, c.i, n.i);
-    return r.s;
+    return qatomic_cmpxchg__nocheck(ptr, cmp, new);
 }
 # define HAVE_CMPXCHG128 1
 #elif defined(CONFIG_CMPXCHG128)
 static inline Int128 atomic16_cmpxchg(Int128 *ptr, Int128 cmp, Int128 new)
 {
-    Int128Alias r, c, n;
-
-    c.s = cmp;
-    n.s = new;
-    r.i = __sync_val_compare_and_swap_16((__int128_t *)ptr, c.i, n.i);
-    return r.s;
+    return __sync_val_compare_and_swap_16(ptr, cmp, new);
 }
 # define HAVE_CMPXCHG128 1
 #elif defined(__aarch64__)
@@ -99,18 +89,12 @@ Int128 QEMU_ERROR("unsupported atomic")
 #if defined(CONFIG_ATOMIC128)
 static inline Int128 atomic16_read(Int128 *ptr)
 {
-    Int128Alias r;
-
-    r.i = qatomic_read__nocheck((__int128_t *)ptr);
-    return r.s;
+    return qatomic_read__nocheck(ptr);
 }
 
 static inline void atomic16_set(Int128 *ptr, Int128 val)
 {
-    Int128Alias v;
-
-    v.s = val;
-    qatomic_set__nocheck((__int128_t *)ptr, v.i);
+    qatomic_set__nocheck(ptr, val);
 }
 
 # define HAVE_ATOMIC128 1
@@ -148,8 +132,7 @@ static inline void atomic16_set(Int128 *ptr, Int128 val)
 static inline Int128 atomic16_read(Int128 *ptr)
 {
     /* Maybe replace 0 with 0, returning the old value.  */
-    Int128 z = int128_make64(0);
-    return atomic16_cmpxchg(ptr, z, z);
+    return atomic16_cmpxchg(ptr, 0, 0);
 }
 
 static inline void atomic16_set(Int128 *ptr, Int128 val)
@@ -158,7 +141,7 @@ static inline void atomic16_set(Int128 *ptr, Int128 val)
     do {
         cmp = old;
         old = atomic16_cmpxchg(ptr, cmp, val);
-    } while (int128_ne(old, cmp));
+    } while (old != cmp);
 }
 
 # define HAVE_ATOMIC128 1

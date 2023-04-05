@@ -17,7 +17,6 @@
 
 #define SYM_URL_BASE    "https://msdl.microsoft.com/download/symbols/"
 #define PDB_NAME    "ntkrnlmp.pdb"
-#define PE_NAME     "ntoskrnl.exe"
 
 #define INITIAL_MXCSR   0x1f80
 
@@ -283,16 +282,14 @@ static int fill_header(WinDumpHeader64 *hdr, struct pa_space *ps,
     };
 
     for (i = 0; i < ps->block_nr; i++) {
-        h.PhysicalMemoryBlock.NumberOfPages +=
-                ps->block[i].size / ELF2DMP_PAGE_SIZE;
+        h.PhysicalMemoryBlock.NumberOfPages += ps->block[i].size / ELF2DMP_PAGE_SIZE;
         h.PhysicalMemoryBlock.Run[i] = (WinDumpPhyMemRun64) {
             .BasePage = ps->block[i].paddr / ELF2DMP_PAGE_SIZE,
             .PageCount = ps->block[i].size / ELF2DMP_PAGE_SIZE,
         };
     }
 
-    h.RequiredDumpSpace +=
-            h.PhysicalMemoryBlock.NumberOfPages << ELF2DMP_PAGE_BITS;
+    h.RequiredDumpSpace += h.PhysicalMemoryBlock.NumberOfPages << ELF2DMP_PAGE_BITS;
 
     *hdr = h;
 
@@ -302,8 +299,7 @@ static int fill_header(WinDumpHeader64 *hdr, struct pa_space *ps,
 static int fill_context(KDDEBUGGER_DATA64 *kdbg,
         struct va_space *vs, QEMU_Elf *qe)
 {
-    int i;
-
+        int i;
     for (i = 0; i < qe->state_nr; i++) {
         uint64_t Prcb;
         uint64_t Context;
@@ -330,45 +326,6 @@ static int fill_context(KDDEBUGGER_DATA64 *kdbg,
             return 1;
         }
     }
-
-    return 0;
-}
-
-static int pe_get_data_dir_entry(uint64_t base, void *start_addr, int idx,
-        void *entry, size_t size, struct va_space *vs)
-{
-    const char e_magic[2] = "MZ";
-    const char Signature[4] = "PE\0\0";
-    IMAGE_DOS_HEADER *dos_hdr = start_addr;
-    IMAGE_NT_HEADERS64 nt_hdrs;
-    IMAGE_FILE_HEADER *file_hdr = &nt_hdrs.FileHeader;
-    IMAGE_OPTIONAL_HEADER64 *opt_hdr = &nt_hdrs.OptionalHeader;
-    IMAGE_DATA_DIRECTORY *data_dir = nt_hdrs.OptionalHeader.DataDirectory;
-
-    QEMU_BUILD_BUG_ON(sizeof(*dos_hdr) >= ELF2DMP_PAGE_SIZE);
-
-    if (memcmp(&dos_hdr->e_magic, e_magic, sizeof(e_magic))) {
-        return 1;
-    }
-
-    if (va_space_rw(vs, base + dos_hdr->e_lfanew,
-                &nt_hdrs, sizeof(nt_hdrs), 0)) {
-        return 1;
-    }
-
-    if (memcmp(&nt_hdrs.Signature, Signature, sizeof(Signature)) ||
-            file_hdr->Machine != 0x8664 || opt_hdr->Magic != 0x020b) {
-        return 1;
-    }
-
-    if (va_space_rw(vs,
-                base + data_dir[idx].VirtualAddress,
-                entry, size, 0)) {
-        return 1;
-    }
-
-    printf("Data directory entry #%d: RVA = 0x%08"PRIx32"\n", idx,
-            (uint32_t)data_dir[idx].VirtualAddress);
 
     return 0;
 }
@@ -406,38 +363,45 @@ static int write_dump(struct pa_space *ps,
     return fclose(dmp_file);
 }
 
-static bool pe_check_export_name(uint64_t base, void *start_addr,
-        struct va_space *vs)
-{
-    IMAGE_EXPORT_DIRECTORY export_dir;
-    const char *pe_name;
-
-    if (pe_get_data_dir_entry(base, start_addr, IMAGE_FILE_EXPORT_DIRECTORY,
-                &export_dir, sizeof(export_dir), vs)) {
-        return false;
-    }
-
-    pe_name = va_space_resolve(vs, base + export_dir.Name);
-    if (!pe_name) {
-        return false;
-    }
-
-    return !strcmp(pe_name, PE_NAME);
-}
-
 static int pe_get_pdb_symstore_hash(uint64_t base, void *start_addr,
         char *hash, struct va_space *vs)
 {
+    const char e_magic[2] = "MZ";
+    const char Signature[4] = "PE\0\0";
     const char sign_rsds[4] = "RSDS";
+    IMAGE_DOS_HEADER *dos_hdr = start_addr;
+    IMAGE_NT_HEADERS64 nt_hdrs;
+    IMAGE_FILE_HEADER *file_hdr = &nt_hdrs.FileHeader;
+    IMAGE_OPTIONAL_HEADER64 *opt_hdr = &nt_hdrs.OptionalHeader;
+    IMAGE_DATA_DIRECTORY *data_dir = nt_hdrs.OptionalHeader.DataDirectory;
     IMAGE_DEBUG_DIRECTORY debug_dir;
     OMFSignatureRSDS rsds;
     char *pdb_name;
     size_t pdb_name_sz;
     size_t i;
 
-    if (pe_get_data_dir_entry(base, start_addr, IMAGE_FILE_DEBUG_DIRECTORY,
-                &debug_dir, sizeof(debug_dir), vs)) {
-        eprintf("Failed to get Debug Directory\n");
+    QEMU_BUILD_BUG_ON(sizeof(*dos_hdr) >= ELF2DMP_PAGE_SIZE);
+
+    if (memcmp(&dos_hdr->e_magic, e_magic, sizeof(e_magic))) {
+        return 1;
+    }
+
+    if (va_space_rw(vs, base + dos_hdr->e_lfanew,
+                &nt_hdrs, sizeof(nt_hdrs), 0)) {
+        return 1;
+    }
+
+    if (memcmp(&nt_hdrs.Signature, Signature, sizeof(Signature)) ||
+            file_hdr->Machine != 0x8664 || opt_hdr->Magic != 0x020b) {
+        return 1;
+    }
+
+    printf("Debug Directory RVA = 0x%08"PRIx32"\n",
+            (uint32_t)data_dir[IMAGE_FILE_DEBUG_DIRECTORY].VirtualAddress);
+
+    if (va_space_rw(vs,
+                base + data_dir[IMAGE_FILE_DEBUG_DIRECTORY].VirtualAddress,
+                &debug_dir, sizeof(debug_dir), 0)) {
         return 1;
     }
 
@@ -509,7 +473,6 @@ int main(int argc, char *argv[])
     uint64_t KdDebuggerDataBlock;
     KDDEBUGGER_DATA64 *kdbg;
     uint64_t KdVersionBlock;
-    bool kernel_found = false;
 
     if (argc != 3) {
         eprintf("usage:\n\t%s elf_file dmp_file\n", argv[0]);
@@ -557,14 +520,11 @@ int main(int argc, char *argv[])
         }
 
         if (*(uint16_t *)nt_start_addr == 0x5a4d) { /* MZ */
-            if (pe_check_export_name(KernBase, nt_start_addr, &vs)) {
-                kernel_found = true;
-                break;
-            }
+            break;
         }
     }
 
-    if (!kernel_found) {
+    if (!nt_start_addr) {
         eprintf("Failed to find NT kernel image\n");
         err = 1;
         goto out_ps;

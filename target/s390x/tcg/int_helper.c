@@ -34,68 +34,88 @@
 #endif
 
 /* 64/32 -> 32 signed division */
-uint64_t HELPER(divs32)(CPUS390XState *env, int64_t a, int64_t b64)
+int64_t HELPER(divs32)(CPUS390XState *env, int64_t a, int64_t b64)
 {
-    int32_t b = b64;
-    int64_t q, r;
+    int32_t ret, b = b64;
+    int64_t q;
 
     if (b == 0) {
         tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
 
-    q = a / b;
-    r = a % b;
+    ret = q = a / b;
+    env->retxl = a % b;
 
     /* Catch non-representable quotient.  */
-    if (q != (int32_t)q) {
+    if (ret != q) {
         tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
 
-    return deposit64(q, 32, 32, r);
+    return ret;
 }
 
 /* 64/32 -> 32 unsigned division */
 uint64_t HELPER(divu32)(CPUS390XState *env, uint64_t a, uint64_t b64)
 {
-    uint32_t b = b64;
-    uint64_t q, r;
+    uint32_t ret, b = b64;
+    uint64_t q;
 
     if (b == 0) {
         tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
 
-    q = a / b;
-    r = a % b;
+    ret = q = a / b;
+    env->retxl = a % b;
 
     /* Catch non-representable quotient.  */
-    if (q != (uint32_t)q) {
+    if (ret != q) {
         tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
 
-    return deposit64(q, 32, 32, r);
+    return ret;
 }
 
 /* 64/64 -> 64 signed division */
-Int128 HELPER(divs64)(CPUS390XState *env, int64_t a, int64_t b)
+int64_t HELPER(divs64)(CPUS390XState *env, int64_t a, int64_t b)
 {
     /* Catch divide by zero, and non-representable quotient (MIN / -1).  */
     if (b == 0 || (b == -1 && a == (1ll << 63))) {
         tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
-    return int128_make128(a / b, a % b);
+    env->retxl = a % b;
+    return a / b;
 }
 
 /* 128 -> 64/64 unsigned division */
-Int128 HELPER(divu64)(CPUS390XState *env, uint64_t ah, uint64_t al, uint64_t b)
+uint64_t HELPER(divu64)(CPUS390XState *env, uint64_t ah, uint64_t al,
+                        uint64_t b)
 {
-    if (b != 0) {
-        uint64_t r = divu128(&al, &ah, b);
-        if (ah == 0) {
-            return int128_make128(al, r);
-        }
+    uint64_t ret;
+    /* Signal divide by zero.  */
+    if (b == 0) {
+        tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
     }
-    /* divide by zero or overflow */
-    tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
+    if (ah == 0) {
+        /* 64 -> 64/64 case */
+        env->retxl = al % b;
+        ret = al / b;
+    } else {
+        /* ??? Move i386 idivq helper to host-utils.  */
+#ifdef CONFIG_INT128
+        __uint128_t a = ((__uint128_t)ah << 64) | al;
+        __uint128_t q = a / b;
+        env->retxl = a % b;
+        ret = q;
+        if (ret != q) {
+            tcg_s390_program_interrupt(env, PGM_FIXPT_DIVIDE, GETPC());
+        }
+#else
+        /* 32-bit hosts would need special wrapper functionality - just abort if
+           we encounter such a case; it's very unlikely anyways. */
+        cpu_abort(env_cpu(env), "128 -> 64/64 division not implemented\n");
+#endif
+    }
+    return ret;
 }
 
 uint64_t HELPER(cvd)(int32_t reg)

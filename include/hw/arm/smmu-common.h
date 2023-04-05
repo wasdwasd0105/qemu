@@ -27,6 +27,8 @@
 #define SMMU_PCI_DEVFN_MAX    256
 #define SMMU_PCI_DEVFN(sid)   (sid & 0xFF)
 
+#define SMMU_MAX_VA_BITS      48
+
 /*
  * Page table walk error types
  */
@@ -170,5 +172,8 @@ void smmu_iotlb_inv_iova(SMMUState *s, int asid, dma_addr_t iova,
 
 /* Unmap the range of all the notifiers registered to any IOMMU mr */
 void smmu_inv_notifiers_all(SMMUState *s);
+
+/* Unmap the range of all the notifiers registered to @mr */
+void smmu_inv_notifiers_mr(IOMMUMemoryRegion *mr);
 
 #endif /* HW_ARM_SMMU_COMMON_H */

@@ -25,6 +25,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "hw/input/adb.h"
 #include "hw/irq.h"
 #include "hw/misc/mos6522.h"
 #include "hw/qdev-properties.h"
@@ -642,9 +643,9 @@ const VMStateDescription vmstate_mos6522 = {
     }
 };
 
-static void mos6522_reset_hold(Object *obj)
+static void mos6522_reset(DeviceState *dev)
 {
-    MOS6522State *s = MOS6522(obj);
+    MOS6522State *s = MOS6522(dev);
 
     s->b = 0;
     s->a = 0;
@@ -704,10 +705,9 @@ static Property mos6522_properties[] = {
 static void mos6522_class_init(ObjectClass *oc, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
-    ResettableClass *rc = RESETTABLE_CLASS(oc);
     MOS6522DeviceClass *mdc = MOS6522_CLASS(oc);
 
-    rc->phases.hold = mos6522_reset_hold;
+    dc->reset = mos6522_reset;
     dc->vmsd = &vmstate_mos6522;
     device_class_set_props(dc, mos6522_properties);
     mdc->portB_write = mos6522_portB_write;

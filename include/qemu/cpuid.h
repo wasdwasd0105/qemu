@@ -71,11 +71,4 @@
 #define bit_LZCNT       (1 << 5)
 #endif
 
-static inline unsigned xgetbv_low(unsigned c)
-{
-    unsigned a, d;
-    asm("xgetbv" : "=a"(a), "=d"(d) : "c"(c));
-    return a;
-}
-
 #endif /* QEMU_CPUID_H */

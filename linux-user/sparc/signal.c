@@ -503,23 +503,7 @@ long do_rt_sigreturn(CPUSPARCState *env)
     return -QEMU_ESIGRETURN;
 }
 
-#ifdef TARGET_ABI32
-void setup_sigtramp(abi_ulong sigtramp_page)
-{
-    uint32_t *tramp = lock_user(VERIFY_WRITE, sigtramp_page, 2 * 8, 0);
-    assert(tramp != NULL);
-
-    default_sigreturn = sigtramp_page;
-    install_sigtramp(tramp, TARGET_NR_sigreturn);
-
-    default_rt_sigreturn = sigtramp_page + 8;
-    install_sigtramp(tramp + 2, TARGET_NR_rt_sigreturn);
-
-    unlock_user(tramp, sigtramp_page, 2 * 8);
-}
-#endif
-
-#ifdef TARGET_SPARC64
+#if defined(TARGET_SPARC64) && !defined(TARGET_ABI32)
 #define SPARC_MC_TSTATE 0
 #define SPARC_MC_PC 1
 #define SPARC_MC_NPC 2
@@ -591,7 +575,7 @@ void sparc64_set_context(CPUSPARCState *env)
     struct target_ucontext *ucp;
     target_mc_gregset_t *grp;
     target_mc_fpu_t *fpup;
-    target_ulong pc, npc, tstate;
+    abi_ulong pc, npc, tstate;
     unsigned int i;
     unsigned char fenab;
 
@@ -789,4 +773,18 @@ do_sigsegv:
     unlock_user_struct(ucp, ucp_addr, 1);
     force_sig(TARGET_SIGSEGV);
 }
-#endif /* TARGET_SPARC64 */
+#else
+void setup_sigtramp(abi_ulong sigtramp_page)
+{
+    uint32_t *tramp = lock_user(VERIFY_WRITE, sigtramp_page, 2 * 8, 0);
+    assert(tramp != NULL);
+
+    default_sigreturn = sigtramp_page;
+    install_sigtramp(tramp, TARGET_NR_sigreturn);
+
+    default_rt_sigreturn = sigtramp_page + 8;
+    install_sigtramp(tramp + 2, TARGET_NR_rt_sigreturn);
+
+    unlock_user(tramp, sigtramp_page, 2 * 8);
+}
+#endif

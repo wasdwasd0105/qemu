@@ -323,7 +323,7 @@ virgl_cmd_set_scanout(VuGpu *g,
                       struct virtio_gpu_ctrl_command *cmd)
 {
     struct virtio_gpu_set_scanout ss;
-    struct virgl_renderer_resource_info info;
+    struct virgl_renderer_texture_info info;
     int ret;
 
     VUGPU_FILL_CMD(ss);
@@ -338,7 +338,7 @@ virgl_cmd_set_scanout(VuGpu *g,
     memset(&info, 0, sizeof(info));
 
     if (ss.resource_id && ss.r.width && ss.r.height) {
-        ret = virgl_renderer_resource_get_info(ss.resource_id, &info);
+        ret = virgl_renderer_borrow_texture_for_scanout(ss.resource_id, &info);
         if (ret == -1) {
             g_critical("%s: illegal resource specified %d\n",
                        __func__, ss.resource_id);

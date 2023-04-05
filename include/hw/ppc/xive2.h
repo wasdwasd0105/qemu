@@ -11,9 +11,7 @@
 #ifndef PPC_XIVE2_H
 #define PPC_XIVE2_H
 
-#include "hw/ppc/xive.h"
 #include "hw/ppc/xive2_regs.h"
-#include "hw/sysbus.h"
 
 /*
  * XIVE2 Router (POWER10)

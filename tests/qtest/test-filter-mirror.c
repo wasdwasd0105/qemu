@@ -76,8 +76,12 @@ static void test_mirror(void)
 
 int main(int argc, char **argv)
 {
+    int ret;
+
     g_test_init(&argc, &argv, NULL);
 
     qtest_add_func("/netfilter/mirror", test_mirror);
-    return g_test_run();
+    ret = g_test_run();
+
+    return ret;
 }

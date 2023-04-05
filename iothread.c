@@ -25,6 +25,10 @@
 #include "qemu/rcu.h"
 #include "qemu/main-loop.h"
 
+typedef ObjectClass IOThreadClass;
+
+DECLARE_CLASS_CHECKERS(IOThreadClass, IOTHREAD,
+                       TYPE_IOTHREAD)
 
 #ifdef CONFIG_POSIX
 /* Benchmark results from 2016 on NVMe SSD drives show max polling times around
@@ -151,8 +155,8 @@ static void iothread_init_gcontext(IOThread *iothread)
 
 static void iothread_set_aio_context_params(EventLoopBase *base, Error **errp)
 {
-    ERRP_GUARD();
     IOThread *iothread = IOTHREAD(base);
+    ERRP_GUARD();
 
     if (!iothread->ctx) {
         return;

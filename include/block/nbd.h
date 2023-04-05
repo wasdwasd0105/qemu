@@ -24,7 +24,6 @@
 #include "io/channel-socket.h"
 #include "crypto/tlscreds.h"
 #include "qapi/error.h"
-#include "qemu/bswap.h"
 
 extern const BlockExportDriver blk_exp_nbd;
 

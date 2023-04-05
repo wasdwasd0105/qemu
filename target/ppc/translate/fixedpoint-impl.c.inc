@@ -42,6 +42,8 @@ static bool do_ldst(DisasContext *ctx, int rt, int ra, TCGv displ, bool update,
     if (update) {
         tcg_gen_mov_tl(cpu_gpr[ra], ea);
     }
+    tcg_temp_free(ea);
+
     return true;
 }
 
@@ -147,6 +149,7 @@ static bool do_ldst_quad(DisasContext *ctx, arg_D *a, bool store, bool prefixed)
             tcg_gen_qemu_ld_i64(high_addr_gpr, ea, ctx->mem_idx, mop);
         }
     }
+    tcg_temp_free(ea);
 #else
     qemu_build_not_reached();
 #endif
@@ -386,6 +389,8 @@ static bool do_set_bool_cond(DisasContext *ctx, arg_X_bi *a, bool neg, bool rev)
     if (neg) {
         tcg_gen_neg_tl(cpu_gpr[a->rt], cpu_gpr[a->rt]);
     }
+    tcg_temp_free(temp);
+
     return true;
 }
 
@@ -432,6 +437,9 @@ static void do_cntzdm(TCGv_i64 dst, TCGv_i64 src, TCGv_i64 mask, int64_t trail)
     }
 
     tcg_gen_ctpop_i64(dst, t0);
+
+    tcg_temp_free_i64(t0);
+    tcg_temp_free_i64(t1);
 }
 
 static bool trans_CNTLZDM(DisasContext *ctx, arg_X *a)
@@ -484,35 +492,38 @@ static bool trans_PEXTD(DisasContext *ctx, arg_X *a)
 
 static bool trans_ADDG6S(DisasContext *ctx, arg_X *a)
 {
-    const target_ulong carry_bits = (target_ulong)-1 / 0xf;
-    TCGv in1, in2, carryl, carryh, tmp;
-    TCGv zero = tcg_constant_tl(0);
+    const uint64_t carry_bits = 0x1111111111111111ULL;
+    TCGv t0, t1, carry, zero = tcg_constant_tl(0);
 
     REQUIRE_INSNS_FLAGS2(ctx, BCDA_ISA206);
 
-    in1 = cpu_gpr[a->ra];
-    in2 = cpu_gpr[a->rb];
-    tmp = tcg_temp_new();
-    carryl = tcg_temp_new();
-    carryh = tcg_temp_new();
+    t0 = tcg_temp_new();
+    t1 = tcg_const_tl(0);
+    carry = tcg_const_tl(0);
 
-    /* Addition with carry. */
-    tcg_gen_add2_tl(carryl, carryh, in1, zero, in2, zero);
-    /* Addition without carry. */
-    tcg_gen_xor_tl(tmp, in1, in2);
-    /* Difference between the two is carry in to each bit. */
-    tcg_gen_xor_tl(carryl, carryl, tmp);
+    for (int i = 0; i < 16; i++) {
+        tcg_gen_shri_tl(t0, cpu_gpr[a->ra], i * 4);
+        tcg_gen_andi_tl(t0, t0, 0xf);
+        tcg_gen_add_tl(t1, t1, t0);
 
-    /*
-     * The carry-out that we're looking for is the carry-in to
-     * the next nibble.  Shift the double-word down one nibble,
-     * which puts all of the bits back into one word.
-     */
-    tcg_gen_extract2_tl(carryl, carryl, carryh, 4);
+        tcg_gen_shri_tl(t0, cpu_gpr[a->rb], i * 4);
+        tcg_gen_andi_tl(t0, t0, 0xf);
+        tcg_gen_add_tl(t1, t1, t0);
 
-    /* Invert, isolate the carry bits, and produce 6's. */
-    tcg_gen_andc_tl(carryl, tcg_constant_tl(carry_bits), carryl);
-    tcg_gen_muli_tl(cpu_gpr[a->rt], carryl, 6);
+        tcg_gen_andi_tl(t1, t1, 0x10);
+        tcg_gen_setcond_tl(TCG_COND_NE, t1, t1, zero);
+
+        tcg_gen_shli_tl(t0, t1, i * 4);
+        tcg_gen_or_tl(carry, carry, t0);
+    }
+
+    tcg_gen_xori_tl(carry, carry, (target_long)carry_bits);
+    tcg_gen_muli_tl(cpu_gpr[a->rt], carry, 6);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+    tcg_temp_free(carry);
+
     return true;
 }
 
@@ -553,6 +564,9 @@ static bool do_hash(DisasContext *ctx, arg_X *a, bool priv,
 
     ea = do_ea_calc(ctx, a->ra, tcg_constant_tl(a->rt));
     helper(cpu_env, ea, cpu_gpr[a->ra], cpu_gpr[a->rb]);
+
+    tcg_temp_free(ea);
+
     return true;
 }
 

@@ -16,7 +16,7 @@
  */
 
 #include "qemu/osdep.h"
-#include "gdbstub/helpers.h"
+#include "exec/gdbstub.h"
 #include "cpu.h"
 #include "internal.h"
 

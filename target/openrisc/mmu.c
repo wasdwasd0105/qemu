@@ -22,7 +22,7 @@
 #include "qemu/log.h"
 #include "cpu.h"
 #include "exec/exec-all.h"
-#include "gdbstub/helpers.h"
+#include "exec/gdbstub.h"
 #include "qemu/host-utils.h"
 #include "hw/loader.h"
 

@@ -30,6 +30,7 @@
 #ifndef HOST_UTILS_H
 #define HOST_UTILS_H
 
+#include "qemu/compiler.h"
 #include "qemu/bswap.h"
 #include "qemu/int128.h"
 

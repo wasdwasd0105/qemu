@@ -26,6 +26,7 @@
 #include "target/arm/idau.h"
 #include "qemu/module.h"
 #include "qapi/error.h"
+#include "qapi/visitor.h"
 #include "cpu.h"
 #ifdef CONFIG_TCG
 #include "hw/core/tcg-cpu-ops.h"
@@ -36,10 +37,7 @@
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/loader.h"
 #include "hw/boards.h"
-#ifdef CONFIG_TCG
-#include "hw/intc/armv7m_nvic.h"
-#endif /* CONFIG_TCG */
-#endif /* !CONFIG_USER_ONLY */
+#endif
 #include "sysemu/tcg.h"
 #include "sysemu/qtest.h"
 #include "sysemu/hw_accel.h"
@@ -78,17 +76,17 @@ static vaddr arm_cpu_get_pc(CPUState *cs)
 void arm_cpu_synchronize_from_tb(CPUState *cs,
                                  const TranslationBlock *tb)
 {
-    /* The program counter is always up to date with CF_PCREL. */
-    if (!(tb_cflags(tb) & CF_PCREL)) {
+    /* The program counter is always up to date with TARGET_TB_PCREL. */
+    if (!TARGET_TB_PCREL) {
         CPUARMState *env = cs->env_ptr;
         /*
          * It's OK to look at env for the current mode here, because it's
          * never possible for an AArch64 TB to chain to an AArch32 TB.
          */
         if (is_a64(env)) {
-            env->pc = tb->pc;
+            env->pc = tb_pc(tb);
         } else {
-            env->regs[15] = tb->pc;
+            env->regs[15] = tb_pc(tb);
         }
     }
 }
@@ -100,7 +98,7 @@ void arm_restore_state_to_opc(CPUState *cs,
     CPUARMState *env = cs->env_ptr;
 
     if (is_a64(env)) {
-        if (tb_cflags(tb) & CF_PCREL) {
+        if (TARGET_TB_PCREL) {
             env->pc = (env->pc & TARGET_PAGE_MASK) | data[0];
         } else {
             env->pc = data[0];
@@ -108,7 +106,7 @@ void arm_restore_state_to_opc(CPUState *cs,
         env->condexec_bits = 0;
         env->exception.syndrome = data[2] << ARM_INSN_START_WORD2_SHIFT;
     } else {
-        if (tb_cflags(tb) & CF_PCREL) {
+        if (TARGET_TB_PCREL) {
             env->regs[15] = (env->regs[15] & TARGET_PAGE_MASK) | data[0];
         } else {
             env->regs[15] = data[0];
@@ -204,16 +202,14 @@ static void cp_reg_check_reset(gpointer key, gpointer value,  gpointer opaque)
     assert(oldvalue == newvalue);
 }
 
-static void arm_cpu_reset_hold(Object *obj)
+static void arm_cpu_reset(DeviceState *dev)
 {
-    CPUState *s = CPU(obj);
+    CPUState *s = CPU(dev);
     ARMCPU *cpu = ARM_CPU(s);
     ARMCPUClass *acc = ARM_CPU_GET_CLASS(cpu);
     CPUARMState *env = &cpu->env;
 
-    if (acc->parent_phases.hold) {
-        acc->parent_phases.hold(obj);
-    }
+    acc->parent_reset(dev);
 
     memset(env, 0, offsetof(CPUARMState, end_reset_fields));
 
@@ -311,10 +307,6 @@ static void arm_cpu_reset_hold(Object *obj)
         env->cp15.cpacr_el1 = FIELD_DP64(env->cp15.cpacr_el1,
                                          CPACR, CP11, 3);
 #endif
-        if (arm_feature(env, ARM_FEATURE_V8)) {
-            env->cp15.rvbar = cpu->rvbar_prop;
-            env->regs[15] = cpu->rvbar_prop;
-        }
     }
 
 #if defined(CONFIG_USER_ONLY)
@@ -493,14 +485,6 @@ static void arm_cpu_reset_hold(Object *obj)
                        sizeof(*env->pmsav7.dracr) * cpu->pmsav7_dregion);
             }
         }
-
-        if (cpu->pmsav8r_hdregion > 0) {
-            memset(env->pmsav8.hprbar, 0,
-                   sizeof(*env->pmsav8.hprbar) * cpu->pmsav8r_hdregion);
-            memset(env->pmsav8.hprlar, 0,
-                   sizeof(*env->pmsav8.hprlar) * cpu->pmsav8r_hdregion);
-        }
-
         env->pmsav7.rnr[M_REG_NS] = 0;
         env->pmsav7.rnr[M_REG_S] = 0;
         env->pmsav8.mair0[M_REG_NS] = 0;
@@ -539,15 +523,12 @@ static void arm_cpu_reset_hold(Object *obj)
     }
 #endif
 
-    if (tcg_enabled()) {
-        hw_breakpoint_update_all(cpu);
-        hw_watchpoint_update_all(cpu);
-
-        arm_rebuild_hflags(env);
-    }
+    hw_breakpoint_update_all(cpu);
+    hw_watchpoint_update_all(cpu);
+    arm_rebuild_hflags(env);
 }
 
-#if defined(CONFIG_TCG) && !defined(CONFIG_USER_ONLY)
+#ifndef CONFIG_USER_ONLY
 
 static inline bool arm_excp_unmasked(CPUState *cs, unsigned int excp_idx,
                                      unsigned int target_el,
@@ -744,8 +725,7 @@ static bool arm_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
     cc->tcg_ops->do_interrupt(cs);
     return true;
 }
-
-#endif /* CONFIG_TCG && !CONFIG_USER_ONLY */
+#endif /* !CONFIG_USER_ONLY */
 
 void arm_cpu_update_virq(ARMCPU *cpu)
 {
@@ -1362,7 +1342,7 @@ void arm_cpu_post_init(Object *obj)
         qdev_property_add_static(DEVICE(obj), &arm_cpu_reset_hivecs_property);
     }
 
-    if (arm_feature(&cpu->env, ARM_FEATURE_V8)) {
+    if (arm_feature(&cpu->env, ARM_FEATURE_AARCH64)) {
         object_property_add_uint64_ptr(obj, "rvbar",
                                        &cpu->rvbar_prop,
                                        OBJ_PROP_FLAG_READWRITE);
@@ -1556,11 +1536,6 @@ static void arm_cpu_realizefn(DeviceState *dev, Error **errp)
     int pagebits;
     Error *local_err = NULL;
     bool no_aa32 = false;
-
-    /* Use pc-relative instructions in system-mode */
-#ifndef CONFIG_USER_ONLY
-    cs->tcg_cflags |= CF_PCREL;
-#endif
 
     /* If we needed to query the host kernel for the CPU features
      * then it's possible that might have failed in the initfn, but
@@ -2020,10 +1995,11 @@ static void arm_cpu_realizefn(DeviceState *dev, Error **errp)
     /* MPU can be configured out of a PMSA CPU either by setting has-mpu
      * to false or by setting pmsav7-dregion to 0.
      */
-    if (!cpu->has_mpu || cpu->pmsav7_dregion == 0) {
-        cpu->has_mpu = false;
+    if (!cpu->has_mpu) {
         cpu->pmsav7_dregion = 0;
-        cpu->pmsav8r_hdregion = 0;
+    }
+    if (cpu->pmsav7_dregion == 0) {
+        cpu->has_mpu = false;
     }
 
     if (arm_feature(env, ARM_FEATURE_PMSA) &&
@@ -2049,19 +2025,6 @@ static void arm_cpu_realizefn(DeviceState *dev, Error **errp)
                 env->pmsav7.drsr = g_new0(uint32_t, nr);
                 env->pmsav7.dracr = g_new0(uint32_t, nr);
             }
-        }
-
-        if (cpu->pmsav8r_hdregion > 0xff) {
-            error_setg(errp, "PMSAv8 MPU EL2 #regions invalid %" PRIu32,
-                              cpu->pmsav8r_hdregion);
-            return;
-        }
-
-        if (cpu->pmsav8r_hdregion) {
-            env->pmsav8.hprbar = g_new0(uint32_t,
-                                        cpu->pmsav8r_hdregion);
-            env->pmsav8.hprlar = g_new0(uint32_t,
-                                        cpu->pmsav8r_hdregion);
         }
     }
 
@@ -2247,15 +2210,12 @@ static void arm_cpu_class_init(ObjectClass *oc, void *data)
     ARMCPUClass *acc = ARM_CPU_CLASS(oc);
     CPUClass *cc = CPU_CLASS(acc);
     DeviceClass *dc = DEVICE_CLASS(oc);
-    ResettableClass *rc = RESETTABLE_CLASS(oc);
 
     device_class_set_parent_realize(dc, arm_cpu_realizefn,
                                     &acc->parent_realize);
 
     device_class_set_props(dc, arm_cpu_properties);
-
-    resettable_class_set_parent_phases(rc, NULL, arm_cpu_reset_hold, NULL,
-                                       &acc->parent_phases);
+    device_class_set_parent_reset(dc, arm_cpu_reset, &acc->parent_reset);
 
     cc->class_by_name = arm_cpu_class_by_name;
     cc->has_work = arm_cpu_has_work;

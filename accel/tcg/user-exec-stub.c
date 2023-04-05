@@ -1,6 +1,6 @@
 #include "qemu/osdep.h"
 #include "hw/core/cpu.h"
-#include "exec/replay-core.h"
+#include "sysemu/replay.h"
 
 bool enable_cpu_pm = false;
 

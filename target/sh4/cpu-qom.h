@@ -34,7 +34,7 @@ OBJECT_DECLARE_CPU_TYPE(SuperHCPU, SuperHCPUClass, SUPERH_CPU)
 /**
  * SuperHCPUClass:
  * @parent_realize: The parent class' realize handler.
- * @parent_phases: The parent class' reset phase handlers.
+ * @parent_reset: The parent class' reset handler.
  * @pvr: Processor Version Register
  * @prr: Processor Revision Register
  * @cvr: Cache Version Register
@@ -47,7 +47,7 @@ struct SuperHCPUClass {
     /*< public >*/
 
     DeviceRealize parent_realize;
-    ResettablePhases parent_phases;
+    DeviceReset parent_reset;
 
     uint32_t pvr;
     uint32_t prr;

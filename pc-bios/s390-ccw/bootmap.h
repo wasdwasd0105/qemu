@@ -45,23 +45,9 @@ typedef struct EckdBlockPtr {
                     * it's 0 for TablePtr, ScriptPtr, and SectionPtr */
 } __attribute__ ((packed)) EckdBlockPtr;
 
-typedef struct LdEckdCHS {
-    uint32_t cylinder;
-    uint8_t head;
-    uint8_t sector;
-} __attribute__ ((packed)) LdEckdCHS;
-
-typedef struct LdEckdBlockPtr {
-    LdEckdCHS chs; /* cylinder/head/sector is an address of the block */
-    uint8_t reserved[4];
-    uint16_t count;
-    uint32_t pad;
-} __attribute__ ((packed)) LdEckdBlockPtr;
-
-/* bptr is used for CCW type IPL, while ldptr is for list-directed IPL */
-typedef union ExtEckdBlockPtr {
+typedef struct ExtEckdBlockPtr {
     EckdBlockPtr bptr;
-    LdEckdBlockPtr ldptr;
+    uint8_t reserved[8];
 } __attribute__ ((packed)) ExtEckdBlockPtr;
 
 typedef union BootMapPointer {
@@ -70,15 +56,6 @@ typedef union BootMapPointer {
     EckdBlockPtr eckd;
     ExtEckdBlockPtr xeckd;
 } __attribute__ ((packed)) BootMapPointer;
-
-typedef struct BootRecord {
-    uint8_t magic[4];
-    uint32_t version;
-    uint64_t res1;
-    BootMapPointer pgt;
-    uint8_t reserved[510 - 32];
-    uint16_t os_id;
-} __attribute__ ((packed)) BootRecord;
 
 /* aka Program Table */
 typedef struct BootMapTable {
@@ -315,8 +292,7 @@ typedef struct IplVolumeLabel {
         struct {
             unsigned char key[4]; /* == "VOL1" */
             unsigned char volser[6];
-            unsigned char reserved[64];
-            EckdCHS br; /* Location of Boot Record for list-directed IPL */
+            unsigned char reserved[6];
         } f;
     };
 } __attribute__((packed)) IplVolumeLabel;

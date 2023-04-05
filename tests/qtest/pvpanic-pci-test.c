@@ -86,9 +86,13 @@ static void test_panic(void)
 
 int main(int argc, char **argv)
 {
+    int ret;
+
     g_test_init(&argc, &argv, NULL);
     qtest_add_func("/pvpanic-pci/panic", test_panic);
     qtest_add_func("/pvpanic-pci/panic-nopause", test_panic_nopause);
 
-    return g_test_run();
+    ret = g_test_run();
+
+    return ret;
 }

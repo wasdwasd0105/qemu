@@ -55,6 +55,7 @@ struct VirtIOBlock {
     VirtIODevice parent_obj;
     BlockBackend *blk;
     void *rq;
+    QEMUBH *bh;
     VirtIOBlkConf conf;
     unsigned short sector_mask;
     bool original_wce;
@@ -92,5 +93,6 @@ typedef struct MultiReqBuffer {
 } MultiReqBuffer;
 
 void virtio_blk_handle_vq(VirtIOBlock *s, VirtQueue *vq);
+void virtio_blk_process_queued_requests(VirtIOBlock *s, bool is_bh);
 
 #endif

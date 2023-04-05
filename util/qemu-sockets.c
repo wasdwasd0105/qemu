@@ -210,8 +210,7 @@ static int inet_listen_saddr(InetSocketAddress *saddr,
                              int num,
                              Error **errp)
 {
-    ERRP_GUARD();
-    struct addrinfo ai, *res, *e;
+    struct addrinfo ai,*res,*e;
     char port[33];
     char uaddr[INET6_ADDRSTRLEN+1];
     char uport[33];
@@ -219,6 +218,7 @@ static int inet_listen_saddr(InetSocketAddress *saddr,
     int slisten = -1;
     int saved_errno = 0;
     bool socket_created = false;
+    Error *err = NULL;
 
     if (saddr->keep_alive) {
         error_setg(errp, "keep-alive option is not supported for passive "
@@ -231,9 +231,11 @@ static int inet_listen_saddr(InetSocketAddress *saddr,
     if (saddr->has_numeric && saddr->numeric) {
         ai.ai_flags |= AI_NUMERICHOST | AI_NUMERICSERV;
     }
+    ai.ai_family = inet_ai_family_from_address(saddr, &err);
     ai.ai_socktype = SOCK_STREAM;
-    ai.ai_family = inet_ai_family_from_address(saddr, errp);
-    if (*errp) {
+
+    if (err) {
+        error_propagate(errp, err);
         return -1;
     }
 
@@ -326,7 +328,7 @@ static int inet_listen_saddr(InetSocketAddress *saddr,
              * recover from this situation, so we need to recreate the
              * socket to allow bind attempts for subsequent ports:
              */
-            close(slisten);
+            closesocket(slisten);
             slisten = -1;
         }
     }
@@ -337,7 +339,7 @@ static int inet_listen_saddr(InetSocketAddress *saddr,
 listen_failed:
     saved_errno = errno;
     if (slisten >= 0) {
-        close(slisten);
+        closesocket(slisten);
     }
     freeaddrinfo(res);
     errno = saved_errno;
@@ -380,7 +382,7 @@ static int inet_connect_addr(const InetSocketAddress *saddr,
     if (rc < 0) {
         error_setg_errno(errp, errno, "Failed to connect to '%s:%s'",
                          saddr->host, saddr->port);
-        close(sock);
+        closesocket(sock);
         return -1;
     }
 
@@ -390,9 +392,9 @@ static int inet_connect_addr(const InetSocketAddress *saddr,
 static struct addrinfo *inet_parse_connect_saddr(InetSocketAddress *saddr,
                                                  Error **errp)
 {
-    ERRP_GUARD();
     struct addrinfo ai, *res;
     int rc;
+    Error *err = NULL;
     static int useV4Mapped = 1;
 
     memset(&ai, 0, sizeof(ai));
@@ -401,9 +403,11 @@ static struct addrinfo *inet_parse_connect_saddr(InetSocketAddress *saddr,
     if (qatomic_read(&useV4Mapped)) {
         ai.ai_flags |= AI_V4MAPPED;
     }
+    ai.ai_family = inet_ai_family_from_address(saddr, &err);
     ai.ai_socktype = SOCK_STREAM;
-    ai.ai_family = inet_ai_family_from_address(saddr, errp);
-    if (*errp) {
+
+    if (err) {
+        error_propagate(errp, err);
         return NULL;
     }
 
@@ -483,7 +487,7 @@ int inet_connect_saddr(InetSocketAddress *saddr, Error **errp)
 
         if (ret < 0) {
             error_setg_errno(errp, errno, "Unable to set KEEPALIVE");
-            close(sock);
+            closesocket(sock);
             return -1;
         }
     }
@@ -495,18 +499,20 @@ static int inet_dgram_saddr(InetSocketAddress *sraddr,
                             InetSocketAddress *sladdr,
                             Error **errp)
 {
-    ERRP_GUARD();
     struct addrinfo ai, *peer = NULL, *local = NULL;
     const char *addr;
     const char *port;
     int sock = -1, rc;
+    Error *err = NULL;
 
     /* lookup peer addr */
     memset(&ai,0, sizeof(ai));
     ai.ai_flags = AI_CANONNAME | AI_V4MAPPED | AI_ADDRCONFIG;
+    ai.ai_family = inet_ai_family_from_address(sraddr, &err);
     ai.ai_socktype = SOCK_DGRAM;
-    ai.ai_family = inet_ai_family_from_address(sraddr, errp);
-    if (*errp) {
+
+    if (err) {
+        error_propagate(errp, err);
         goto err;
     }
 
@@ -580,7 +586,7 @@ static int inet_dgram_saddr(InetSocketAddress *sraddr,
 
 err:
     if (sock != -1) {
-        close(sock);
+        closesocket(sock);
     }
     if (local) {
         freeaddrinfo(local);
@@ -777,7 +783,7 @@ static int vsock_connect_addr(const VsockSocketAddress *vaddr,
     if (rc < 0) {
         error_setg_errno(errp, errno, "Failed to connect to '%s:%s'",
                          vaddr->cid, vaddr->port);
-        close(sock);
+        closesocket(sock);
         return -1;
     }
 
@@ -814,13 +820,13 @@ static int vsock_listen_saddr(VsockSocketAddress *vaddr,
 
     if (bind(slisten, (const struct sockaddr *)&svm, sizeof(svm)) != 0) {
         error_setg_errno(errp, errno, "Failed to bind socket");
-        close(slisten);
+        closesocket(slisten);
         return -1;
     }
 
     if (listen(slisten, num) != 0) {
         error_setg_errno(errp, errno, "Failed to listen on socket");
-        close(slisten);
+        closesocket(slisten);
         return -1;
     }
     return slisten;
@@ -978,7 +984,7 @@ static int unix_listen_saddr(UnixSocketAddress *saddr,
 
 err:
     g_free(pathbuf);
-    close(sock);
+    closesocket(sock);
     return -1;
 }
 
@@ -1041,7 +1047,7 @@ static int unix_connect_saddr(UnixSocketAddress *saddr, Error **errp)
     return sock;
 
  err:
-    close(sock);
+    closesocket(sock);
     return -1;
 }
 
@@ -1238,7 +1244,7 @@ int socket_listen(SocketAddress *addr, int num, Error **errp)
          */
         if (listen(fd, num) != 0) {
             error_setg_errno(errp, errno, "Failed to listen on fd socket");
-            close(fd);
+            closesocket(fd);
             return -1;
         }
         break;

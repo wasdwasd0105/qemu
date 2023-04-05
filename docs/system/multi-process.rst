@@ -1,5 +1,3 @@
-.. _Multi-process QEMU:
-
 Multi-process QEMU
 ==================
 

@@ -12,7 +12,6 @@
 #include "exec/memory.h"
 #include "hw/sysbus.h"
 #include "hw/misc/mos6522.h"
-#include "hw/input/adb.h"
 #include "qom/object.h"
 
 

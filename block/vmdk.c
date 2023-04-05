@@ -1403,11 +1403,13 @@ static void vmdk_refresh_limits(BlockDriverState *bs, Error **errp)
  * [@skip_start_sector, @skip_end_sector) is not copied or written, and leave
  * it for call to write user data in the request.
  */
-static int coroutine_fn GRAPH_RDLOCK
-get_whole_cluster(BlockDriverState *bs, VmdkExtent *extent,
-                  uint64_t cluster_offset, uint64_t offset,
-                  uint64_t skip_start_bytes, uint64_t skip_end_bytes,
-                  bool zeroed)
+static int coroutine_fn get_whole_cluster(BlockDriverState *bs,
+                                          VmdkExtent *extent,
+                                          uint64_t cluster_offset,
+                                          uint64_t offset,
+                                          uint64_t skip_start_bytes,
+                                          uint64_t skip_end_bytes,
+                                          bool zeroed)
 {
     int ret = VMDK_OK;
     int64_t cluster_bytes;
@@ -1482,8 +1484,8 @@ exit:
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_L2update(VmdkExtent *extent, VmdkMetaData *m_data, uint32_t offset)
+static int coroutine_fn vmdk_L2update(VmdkExtent *extent, VmdkMetaData *m_data,
+                                      uint32_t offset)
 {
     offset = cpu_to_le32(offset);
     /* update L2 table */
@@ -1534,11 +1536,14 @@ vmdk_L2update(VmdkExtent *extent, VmdkMetaData *m_data, uint32_t offset)
  *          VMDK_UNALLOC if cluster is not mapped and @allocate is false.
  *          VMDK_ERROR if failed.
  */
-static int coroutine_fn GRAPH_RDLOCK
-get_cluster_offset(BlockDriverState *bs, VmdkExtent *extent,
-                   VmdkMetaData *m_data, uint64_t offset, bool allocate,
-                   uint64_t *cluster_offset, uint64_t skip_start_bytes,
-                   uint64_t skip_end_bytes)
+static int coroutine_fn get_cluster_offset(BlockDriverState *bs,
+                                           VmdkExtent *extent,
+                                           VmdkMetaData *m_data,
+                                           uint64_t offset,
+                                           bool allocate,
+                                           uint64_t *cluster_offset,
+                                           uint64_t skip_start_bytes,
+                                           uint64_t skip_end_bytes)
 {
     unsigned int l1_index, l2_offset, l2_index;
     int min_index, i, j;
@@ -1731,10 +1736,11 @@ static inline uint64_t vmdk_find_offset_in_cluster(VmdkExtent *extent,
     return extent_relative_offset % cluster_size;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_block_status(BlockDriverState *bs, bool want_zero,
-                     int64_t offset, int64_t bytes, int64_t *pnum,
-                     int64_t *map, BlockDriverState **file)
+static int coroutine_fn vmdk_co_block_status(BlockDriverState *bs,
+                                             bool want_zero,
+                                             int64_t offset, int64_t bytes,
+                                             int64_t *pnum, int64_t *map,
+                                             BlockDriverState **file)
 {
     BDRVVmdkState *s = bs->opaque;
     int64_t index_in_cluster, n, ret;
@@ -1779,7 +1785,7 @@ vmdk_co_block_status(BlockDriverState *bs, bool want_zero,
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 vmdk_write_extent(VmdkExtent *extent, int64_t cluster_offset,
                   int64_t offset_in_cluster, QEMUIOVector *qiov,
                   uint64_t qiov_offset, uint64_t n_bytes,
@@ -1861,9 +1867,10 @@ vmdk_write_extent(VmdkExtent *extent, int64_t cluster_offset,
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 vmdk_read_extent(VmdkExtent *extent, int64_t cluster_offset,
-                 int64_t offset_in_cluster, QEMUIOVector *qiov, int bytes)
+                 int64_t offset_in_cluster, QEMUIOVector *qiov,
+                 int bytes)
 {
     int ret;
     int cluster_bytes, buf_bytes;
@@ -1927,7 +1934,7 @@ vmdk_read_extent(VmdkExtent *extent, int64_t cluster_offset,
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 vmdk_co_preadv(BlockDriverState *bs, int64_t offset, int64_t bytes,
                QEMUIOVector *qiov, BdrvRequestFlags flags)
 {
@@ -2009,9 +2016,9 @@ fail:
  *
  * Returns: error code with 0 for success.
  */
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_pwritev(BlockDriverState *bs, uint64_t offset, uint64_t bytes,
-             QEMUIOVector *qiov, bool zeroed, bool zero_dry_run)
+static int coroutine_fn vmdk_pwritev(BlockDriverState *bs, uint64_t offset,
+                                     uint64_t bytes, QEMUIOVector *qiov,
+                                     bool zeroed, bool zero_dry_run)
 {
     BDRVVmdkState *s = bs->opaque;
     VmdkExtent *extent = NULL;
@@ -2107,7 +2114,7 @@ vmdk_pwritev(BlockDriverState *bs, uint64_t offset, uint64_t bytes,
     return 0;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 vmdk_co_pwritev(BlockDriverState *bs, int64_t offset, int64_t bytes,
                 QEMUIOVector *qiov, BdrvRequestFlags flags)
 {
@@ -2119,7 +2126,7 @@ vmdk_co_pwritev(BlockDriverState *bs, int64_t offset, int64_t bytes,
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
+static int coroutine_fn
 vmdk_co_pwritev_compressed(BlockDriverState *bs, int64_t offset, int64_t bytes,
                            QEMUIOVector *qiov)
 {
@@ -2147,9 +2154,10 @@ vmdk_co_pwritev_compressed(BlockDriverState *bs, int64_t offset, int64_t bytes,
     return vmdk_co_pwritev(bs, offset, bytes, qiov, 0);
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_pwrite_zeroes(BlockDriverState *bs, int64_t offset, int64_t bytes,
-                      BdrvRequestFlags flags)
+static int coroutine_fn vmdk_co_pwrite_zeroes(BlockDriverState *bs,
+                                              int64_t offset,
+                                              int64_t bytes,
+                                              BdrvRequestFlags flags)
 {
     int ret;
     BDRVVmdkState *s = bs->opaque;
@@ -2277,22 +2285,22 @@ exit:
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_create_extent(const char *filename, int64_t filesize, bool flat,
-                   bool compress, bool zeroed_grain, BlockBackend **pbb,
-                   QemuOpts *opts, Error **errp)
+static int vmdk_create_extent(const char *filename, int64_t filesize,
+                              bool flat, bool compress, bool zeroed_grain,
+                              BlockBackend **pbb,
+                              QemuOpts *opts, Error **errp)
 {
     int ret;
     BlockBackend *blk = NULL;
 
-    ret = bdrv_co_create_file(filename, opts, errp);
+    ret = bdrv_create_file(filename, opts, errp);
     if (ret < 0) {
         goto exit;
     }
 
-    blk = blk_co_new_open(filename, NULL, NULL,
-                          BDRV_O_RDWR | BDRV_O_RESIZE | BDRV_O_PROTOCOL,
-                          errp);
+    blk = blk_new_open(filename, NULL, NULL,
+                       BDRV_O_RDWR | BDRV_O_RESIZE | BDRV_O_PROTOCOL,
+                       errp);
     if (blk == NULL) {
         ret = -EIO;
         goto exit;
@@ -2358,10 +2366,14 @@ static int filename_decompose(const char *filename, char *path, char *prefix,
  *           non-split format.
  * idx >= 1: get the n-th extent if in a split subformat
  */
-typedef BlockBackend * coroutine_fn /* GRAPH_RDLOCK */
-    (*vmdk_create_extent_fn)(int64_t size, int idx, bool flat, bool split,
-                             bool compress, bool zeroed_grain, void *opaque,
-                             Error **errp);
+typedef BlockBackend *(*vmdk_create_extent_fn)(int64_t size,
+                                               int idx,
+                                               bool flat,
+                                               bool split,
+                                               bool compress,
+                                               bool zeroed_grain,
+                                               void *opaque,
+                                               Error **errp);
 
 static void vmdk_desc_add_extent(GString *desc,
                                  const char *extent_line_fmt,
@@ -2374,18 +2386,17 @@ static void vmdk_desc_add_extent(GString *desc,
     g_free(basename);
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_do_create(int64_t size,
-                  BlockdevVmdkSubformat subformat,
-                  BlockdevVmdkAdapterType adapter_type,
-                  const char *backing_file,
-                  const char *hw_version,
-                  const char *toolsversion,
-                  bool compat6,
-                  bool zeroed_grain,
-                  vmdk_create_extent_fn extent_fn,
-                  void *opaque,
-                  Error **errp)
+static int coroutine_fn vmdk_co_do_create(int64_t size,
+                                          BlockdevVmdkSubformat subformat,
+                                          BlockdevVmdkAdapterType adapter_type,
+                                          const char *backing_file,
+                                          const char *hw_version,
+                                          const char *toolsversion,
+                                          bool compat6,
+                                          bool zeroed_grain,
+                                          vmdk_create_extent_fn extent_fn,
+                                          void *opaque,
+                                          Error **errp)
 {
     int extent_idx;
     BlockBackend *blk = NULL;
@@ -2506,8 +2517,8 @@ vmdk_co_do_create(int64_t size,
         }
         assert(full_backing);
 
-        backing = blk_co_new_open(full_backing, NULL, NULL,
-                                  BDRV_O_NO_BACKING, errp);
+        backing = blk_new_open(full_backing, NULL, NULL,
+                               BDRV_O_NO_BACKING, errp);
         g_free(full_backing);
         if (backing == NULL) {
             ret = -EIO;
@@ -2605,10 +2616,10 @@ typedef struct {
     QemuOpts *opts;
 } VMDKCreateOptsData;
 
-static BlockBackend * coroutine_fn GRAPH_RDLOCK
-vmdk_co_create_opts_cb(int64_t size, int idx, bool flat, bool split,
-                       bool compress, bool zeroed_grain, void *opaque,
-                       Error **errp)
+static BlockBackend *vmdk_co_create_opts_cb(int64_t size, int idx,
+                                            bool flat, bool split, bool compress,
+                                            bool zeroed_grain, void *opaque,
+                                            Error **errp)
 {
     BlockBackend *blk = NULL;
     BlockDriverState *bs = NULL;
@@ -2647,9 +2658,10 @@ exit:
     return blk;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_create_opts(BlockDriver *drv, const char *filename,
-                    QemuOpts *opts, Error **errp)
+static int coroutine_fn vmdk_co_create_opts(BlockDriver *drv,
+                                            const char *filename,
+                                            QemuOpts *opts,
+                                            Error **errp)
 {
     Error *local_err = NULL;
     char *desc = NULL;
@@ -2756,11 +2768,10 @@ exit:
     return ret;
 }
 
-static BlockBackend * coroutine_fn vmdk_co_create_cb(int64_t size, int idx,
-                                                     bool flat, bool split,
-                                                     bool compress,
-                                                     bool zeroed_grain,
-                                                     void *opaque, Error **errp)
+static BlockBackend *vmdk_co_create_cb(int64_t size, int idx,
+                                       bool flat, bool split, bool compress,
+                                       bool zeroed_grain, void *opaque,
+                                       Error **errp)
 {
     int ret;
     BlockDriverState *bs;
@@ -2768,7 +2779,7 @@ static BlockBackend * coroutine_fn vmdk_co_create_cb(int64_t size, int idx,
     BlockdevCreateOptionsVmdk *opts = opaque;
 
     if (idx == 0) {
-        bs = bdrv_co_open_blockdev_ref(opts->file, errp);
+        bs = bdrv_open_blockdev_ref(opts->file, errp);
     } else {
         int i;
         BlockdevRefList *list = opts->extents;
@@ -2783,16 +2794,14 @@ static BlockBackend * coroutine_fn vmdk_co_create_cb(int64_t size, int idx,
             error_setg(errp, "Extent [%d] not specified", idx - 1);
             return NULL;
         }
-        bs = bdrv_co_open_blockdev_ref(list->value, errp);
+        bs = bdrv_open_blockdev_ref(list->value, errp);
     }
     if (!bs) {
         return NULL;
     }
-    blk = blk_co_new_with_bs(bs,
-                             BLK_PERM_CONSISTENT_READ | BLK_PERM_WRITE |
-                                BLK_PERM_RESIZE,
-                             BLK_PERM_ALL,
-                             errp);
+    blk = blk_new_with_bs(bs,
+                          BLK_PERM_CONSISTENT_READ | BLK_PERM_WRITE | BLK_PERM_RESIZE,
+                          BLK_PERM_ALL, errp);
     if (!blk) {
         return NULL;
     }
@@ -2809,9 +2818,10 @@ static BlockBackend * coroutine_fn vmdk_co_create_cb(int64_t size, int idx,
     return blk;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_create(BlockdevCreateOptions *create_options, Error **errp)
+static int coroutine_fn vmdk_co_create(BlockdevCreateOptions *create_options,
+                                       Error **errp)
 {
+    int ret;
     BlockdevCreateOptionsVmdk *opts;
 
     opts = &create_options->u.vmdk;
@@ -2819,19 +2829,24 @@ vmdk_co_create(BlockdevCreateOptions *create_options, Error **errp)
     /* Validate options */
     if (!QEMU_IS_ALIGNED(opts->size, BDRV_SECTOR_SIZE)) {
         error_setg(errp, "Image size must be a multiple of 512 bytes");
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
-    return vmdk_co_do_create(opts->size,
-                             opts->subformat,
-                             opts->adapter_type,
-                             opts->backing_file,
-                             opts->hwversion,
-                             opts->toolsversion,
-                             false,
-                             opts->zeroed_grain,
-                             vmdk_co_create_cb,
-                             opts, errp);
+    ret = vmdk_co_do_create(opts->size,
+                            opts->subformat,
+                            opts->adapter_type,
+                            opts->backing_file,
+                            opts->hwversion,
+                            opts->toolsversion,
+                            false,
+                            opts->zeroed_grain,
+                            vmdk_co_create_cb,
+                            opts, errp);
+    return ret;
+
+out:
+    return ret;
 }
 
 static void vmdk_close(BlockDriverState *bs)
@@ -2845,15 +2860,14 @@ static void vmdk_close(BlockDriverState *bs)
     error_free(s->migration_blocker);
 }
 
-static int64_t coroutine_fn
-vmdk_co_get_allocated_file_size(BlockDriverState *bs)
+static int64_t vmdk_get_allocated_file_size(BlockDriverState *bs)
 {
     int i;
     int64_t ret = 0;
     int64_t r;
     BDRVVmdkState *s = bs->opaque;
 
-    ret = bdrv_co_get_allocated_file_size(bs->file->bs);
+    ret = bdrv_get_allocated_file_size(bs->file->bs);
     if (ret < 0) {
         return ret;
     }
@@ -2861,7 +2875,7 @@ vmdk_co_get_allocated_file_size(BlockDriverState *bs)
         if (s->extents[i].file == bs->file) {
             continue;
         }
-        r = bdrv_co_get_allocated_file_size(s->extents[i].file->bs);
+        r = bdrv_get_allocated_file_size(s->extents[i].file->bs);
         if (r < 0) {
             return r;
         }
@@ -2887,12 +2901,12 @@ static int vmdk_has_zero_init(BlockDriverState *bs)
     return 1;
 }
 
-static VmdkExtentInfo *vmdk_get_extent_info(VmdkExtent *extent)
+static ImageInfo *vmdk_get_extent_info(VmdkExtent *extent)
 {
-    VmdkExtentInfo *info = g_new0(VmdkExtentInfo, 1);
+    ImageInfo *info = g_new0(ImageInfo, 1);
 
     bdrv_refresh_filename(extent->file->bs);
-    *info = (VmdkExtentInfo){
+    *info = (ImageInfo){
         .filename         = g_strdup(extent->file->bs->filename),
         .format           = g_strdup(extent->type),
         .virtual_size     = extent->sectors * BDRV_SECTOR_SIZE,
@@ -2905,8 +2919,9 @@ static VmdkExtentInfo *vmdk_get_extent_info(VmdkExtent *extent)
     return info;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-vmdk_co_check(BlockDriverState *bs, BdrvCheckResult *result, BdrvCheckMode fix)
+static int coroutine_fn vmdk_co_check(BlockDriverState *bs,
+                                      BdrvCheckResult *result,
+                                      BdrvCheckMode fix)
 {
     BDRVVmdkState *s = bs->opaque;
     VmdkExtent *extent = NULL;
@@ -2970,7 +2985,7 @@ static ImageInfoSpecific *vmdk_get_specific_info(BlockDriverState *bs,
     int i;
     BDRVVmdkState *s = bs->opaque;
     ImageInfoSpecific *spec_info = g_new0(ImageInfoSpecific, 1);
-    VmdkExtentInfoList **tail;
+    ImageInfoList **tail;
 
     *spec_info = (ImageInfoSpecific){
         .type = IMAGE_INFO_SPECIFIC_KIND_VMDK,
@@ -3000,8 +3015,7 @@ static bool vmdk_extents_type_eq(const VmdkExtent *a, const VmdkExtent *b)
            (a->flat || a->cluster_sectors == b->cluster_sectors);
 }
 
-static int coroutine_fn
-vmdk_co_get_info(BlockDriverState *bs, BlockDriverInfo *bdi)
+static int vmdk_get_info(BlockDriverState *bs, BlockDriverInfo *bdi)
 {
     int i;
     BDRVVmdkState *s = bs->opaque;
@@ -3114,11 +3128,11 @@ static BlockDriver bdrv_vmdk = {
     .bdrv_co_create_opts          = vmdk_co_create_opts,
     .bdrv_co_create               = vmdk_co_create,
     .bdrv_co_block_status         = vmdk_co_block_status,
-    .bdrv_co_get_allocated_file_size = vmdk_co_get_allocated_file_size,
+    .bdrv_get_allocated_file_size = vmdk_get_allocated_file_size,
     .bdrv_has_zero_init           = vmdk_has_zero_init,
     .bdrv_get_specific_info       = vmdk_get_specific_info,
     .bdrv_refresh_limits          = vmdk_refresh_limits,
-    .bdrv_co_get_info             = vmdk_co_get_info,
+    .bdrv_get_info                = vmdk_get_info,
     .bdrv_gather_child_options    = vmdk_gather_child_options,
 
     .is_format                    = true,

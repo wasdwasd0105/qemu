@@ -47,7 +47,7 @@ struct M48txxISAState {
 };
 
 struct M48txxISADeviceClass {
-    DeviceClass parent_class;
+    ISADeviceClass parent_class;
     M48txxInfo info;
 };
 

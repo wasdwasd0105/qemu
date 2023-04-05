@@ -12,7 +12,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/error-report.h"
 #include "qemu/iov.h"
 #include "trace.h"
 #include "hw/virtio/virtio.h"
@@ -141,12 +140,39 @@ static void virgl_cmd_resource_flush(VirtIOGPU *g,
     }
 }
 
+static GLuint virgl_borrow_texture_for_scanout(uint32_t id, bool *y_0_top,
+                                               uint32_t *width,
+                                               uint32_t *height)
+{
+    struct virgl_renderer_texture_info info;
+    int ret;
+
+    memset(&info, 0, sizeof(info));
+
+    ret = virgl_renderer_borrow_texture_for_scanout(id, &info);
+    if (ret == -1) {
+        return 0;
+    }
+
+    if (y_0_top) {
+        *y_0_top = info.flags & VIRTIO_GPU_RESOURCE_FLAG_Y_0_TOP;
+    }
+
+    if (width) {
+        *width = info.width;
+    }
+
+    if (height) {
+        *height = info.height;
+    }
+
+    return info.tex_id;
+}
+
 static void virgl_cmd_set_scanout(VirtIOGPU *g,
                                   struct virtio_gpu_ctrl_command *cmd)
 {
     struct virtio_gpu_set_scanout ss;
-    struct virgl_renderer_resource_info info;
-    int ret;
 
     VIRTIO_GPU_FILL_CMD(ss);
     trace_virtio_gpu_cmd_set_scanout(ss.scanout_id, ss.resource_id,
@@ -160,24 +186,13 @@ static void virgl_cmd_set_scanout(VirtIOGPU *g,
     }
     g->parent_obj.enable = 1;
 
-    memset(&info, 0, sizeof(info));
-
     if (ss.resource_id && ss.r.width && ss.r.height) {
-        ret = virgl_renderer_resource_get_info(ss.resource_id, &info);
-        if (ret == -1) {
-            qemu_log_mask(LOG_GUEST_ERROR,
-                          "%s: illegal resource specified %d\n",
-                          __func__, ss.resource_id);
-            cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
-            return;
-        }
         qemu_console_resize(g->parent_obj.scanout[ss.scanout_id].con,
                             ss.r.width, ss.r.height);
         virgl_renderer_force_ctx_0();
         dpy_gl_scanout_texture(
-            g->parent_obj.scanout[ss.scanout_id].con, info.tex_id,
-            info.flags & VIRTIO_GPU_RESOURCE_FLAG_Y_0_TOP,
-            info.width, info.height,
+            g->parent_obj.scanout[ss.scanout_id].con, ss.resource_id,
+            virgl_borrow_texture_for_scanout,
             ss.r.x, ss.r.y, ss.r.width, ss.r.height);
     } else {
         dpy_gfx_replace_surface(

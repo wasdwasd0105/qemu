@@ -228,17 +228,20 @@ static void phb3_msi_resend(ICSState *ics)
     }
 }
 
-static void phb3_msi_reset_hold(Object *obj)
+static void phb3_msi_reset(DeviceState *dev)
 {
-    Phb3MsiState *msi = PHB3_MSI(obj);
-    ICSStateClass *icsc = ICS_GET_CLASS(obj);
+    Phb3MsiState *msi = PHB3_MSI(dev);
+    ICSStateClass *icsc = ICS_GET_CLASS(dev);
 
-    if (icsc->parent_phases.hold) {
-        icsc->parent_phases.hold(obj);
-    }
+    icsc->parent_reset(dev);
 
     memset(msi->rba, 0, sizeof(msi->rba));
     msi->rba_sum = 0;
+}
+
+static void phb3_msi_reset_handler(void *dev)
+{
+    phb3_msi_reset(dev);
 }
 
 void pnv_phb3_msi_update_config(Phb3MsiState *msi, uint32_t base,
@@ -269,6 +272,8 @@ static void phb3_msi_realize(DeviceState *dev, Error **errp)
     }
 
     msi->qirqs = qemu_allocate_irqs(phb3_msi_set_irq, msi, ics->nr_irqs);
+
+    qemu_register_reset(phb3_msi_reset_handler, dev);
 }
 
 static void phb3_msi_instance_init(Object *obj)
@@ -289,12 +294,11 @@ static void phb3_msi_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     ICSStateClass *isc = ICS_CLASS(klass);
-    ResettableClass *rc = RESETTABLE_CLASS(klass);
 
     device_class_set_parent_realize(dc, phb3_msi_realize,
                                     &isc->parent_realize);
-    resettable_class_set_parent_phases(rc, NULL, phb3_msi_reset_hold, NULL,
-                                       &isc->parent_phases);
+    device_class_set_parent_reset(dc, phb3_msi_reset,
+                                  &isc->parent_reset);
 
     isc->reject = phb3_msi_reject;
     isc->resend = phb3_msi_resend;

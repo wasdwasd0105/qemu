@@ -173,9 +173,6 @@ int qio_channel_socket_connect_sync(QIOChannelSocket *ioc,
     }
 #endif
 
-    qio_channel_set_feature(QIO_CHANNEL(ioc),
-                            QIO_CHANNEL_FEATURE_READ_MSG_PEEK);
-
     return 0;
 }
 
@@ -409,9 +406,6 @@ qio_channel_socket_accept(QIOChannelSocket *ioc,
     }
 #endif /* WIN32 */
 
-    qio_channel_set_feature(QIO_CHANNEL(cioc),
-                            QIO_CHANNEL_FEATURE_READ_MSG_PEEK);
-
     trace_qio_channel_socket_accept_complete(ioc, cioc, cioc->fd);
     return cioc;
 
@@ -442,9 +436,9 @@ static void qio_channel_socket_finalize(Object *obj)
             }
         }
 #ifdef WIN32
-        qemu_socket_unselect(ioc->fd, NULL);
+        WSAEventSelect(ioc->fd, NULL, 0);
 #endif
-        close(ioc->fd);
+        closesocket(ioc->fd);
         ioc->fd = -1;
     }
 }
@@ -502,7 +496,6 @@ static ssize_t qio_channel_socket_readv(QIOChannel *ioc,
                                         size_t niov,
                                         int **fds,
                                         size_t *nfds,
-                                        int flags,
                                         Error **errp)
 {
     QIOChannelSocket *sioc = QIO_CHANNEL_SOCKET(ioc);
@@ -522,10 +515,6 @@ static ssize_t qio_channel_socket_readv(QIOChannel *ioc,
         sflags |= MSG_CMSG_CLOEXEC;
 #endif
 
-    }
-
-    if (flags & QIO_CHANNEL_READ_FLAG_MSG_PEEK) {
-        sflags |= MSG_PEEK;
     }
 
  retry:
@@ -635,17 +624,11 @@ static ssize_t qio_channel_socket_readv(QIOChannel *ioc,
                                         size_t niov,
                                         int **fds,
                                         size_t *nfds,
-                                        int flags,
                                         Error **errp)
 {
     QIOChannelSocket *sioc = QIO_CHANNEL_SOCKET(ioc);
     ssize_t done = 0;
     ssize_t i;
-    int sflags = 0;
-
-    if (flags & QIO_CHANNEL_READ_FLAG_MSG_PEEK) {
-        sflags |= MSG_PEEK;
-    }
 
     for (i = 0; i < niov; i++) {
         ssize_t ret;
@@ -653,7 +636,7 @@ static ssize_t qio_channel_socket_readv(QIOChannel *ioc,
         ret = recv(sioc->fd,
                    iov[i].iov_base,
                    iov[i].iov_len,
-                   sflags);
+                   0);
         if (ret < 0) {
             if (errno == EAGAIN) {
                 if (done) {
@@ -846,13 +829,13 @@ qio_channel_socket_close(QIOChannel *ioc,
 
     if (sioc->fd != -1) {
 #ifdef WIN32
-        qemu_socket_unselect(sioc->fd, NULL);
+        WSAEventSelect(sioc->fd, NULL, 0);
 #endif
         if (qio_channel_has_feature(ioc, QIO_CHANNEL_FEATURE_LISTEN)) {
             socket_listen_cleanup(sioc->fd, errp);
         }
 
-        if (close(sioc->fd) < 0) {
+        if (closesocket(sioc->fd) < 0) {
             sioc->fd = -1;
             error_setg_errno(&err, errno, "Unable to close socket");
             error_propagate(errp, err);

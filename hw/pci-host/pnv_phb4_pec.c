@@ -17,7 +17,6 @@
 #include "hw/pci/pci_bridge.h"
 #include "hw/pci/pci_bus.h"
 #include "hw/ppc/pnv.h"
-#include "hw/ppc/pnv_chip.h"
 #include "hw/qdev-properties.h"
 #include "sysemu/sysemu.h"
 
@@ -112,50 +111,9 @@ static const MemoryRegionOps pnv_pec_pci_xscom_ops = {
     .endianness = DEVICE_BIG_ENDIAN,
 };
 
-PnvPhb4PecState *pnv_pec_add_phb(PnvChip *chip, PnvPHB *phb, Error **errp)
-{
-    PnvPhb4PecState *pecs = NULL;
-    int chip_id = phb->chip_id;
-    int index = phb->phb_id;
-    int i, j;
-
-    if (phb->version == 4) {
-        Pnv9Chip *chip9 = PNV9_CHIP(chip);
-
-        pecs = chip9->pecs;
-    } else if (phb->version == 5) {
-        Pnv10Chip *chip10 = PNV10_CHIP(chip);
-
-        pecs = chip10->pecs;
-    } else {
-        g_assert_not_reached();
-    }
-
-    for (i = 0; i < chip->num_pecs; i++) {
-        /*
-         * For each PEC, check the amount of phbs it supports
-         * and see if the given phb4 index matches an index.
-         */
-        PnvPhb4PecState *pec = &pecs[i];
-
-        for (j = 0; j < pec->num_phbs; j++) {
-            if (index == pnv_phb4_pec_get_phb_id(pec, j)) {
-                pec->phbs[j] = phb;
-                phb->pec = pec;
-                return pec;
-            }
-        }
-    }
-    error_setg(errp,
-               "pnv-phb4 chip-id %d index %d didn't match any existing PEC",
-               chip_id, index);
-
-    return NULL;
-}
-
-static PnvPHB *pnv_pec_default_phb_realize(PnvPhb4PecState *pec,
-                                           int stack_no,
-                                           Error **errp)
+static void pnv_pec_default_phb_realize(PnvPhb4PecState *pec,
+                                        int stack_no,
+                                        Error **errp)
 {
     PnvPHB *phb = PNV_PHB(qdev_new(TYPE_PNV_PHB));
     int phb_id = pnv_phb4_pec_get_phb_id(pec, stack_no);
@@ -169,9 +127,8 @@ static PnvPHB *pnv_pec_default_phb_realize(PnvPhb4PecState *pec,
                             &error_fatal);
 
     if (!sysbus_realize(SYS_BUS_DEVICE(phb), errp)) {
-        return NULL;
+        return;
     }
-    return phb;
 }
 
 static void pnv_pec_realize(DeviceState *dev, Error **errp)
@@ -190,9 +147,8 @@ static void pnv_pec_realize(DeviceState *dev, Error **errp)
 
     /* Create PHBs if running with defaults */
     if (defaults_enabled()) {
-        g_assert(pec->num_phbs <= MAX_PHBS_PER_PEC);
         for (i = 0; i < pec->num_phbs; i++) {
-            pec->phbs[i] = pnv_pec_default_phb_realize(pec, i, errp);
+            pnv_pec_default_phb_realize(pec, i, errp);
         }
     }
 
@@ -240,11 +196,8 @@ static int pnv_pec_dt_xscom(PnvXScomInterface *dev, void *fdt,
                       pecc->compat_size)));
 
     for (i = 0; i < pec->num_phbs; i++) {
+        int phb_id = pnv_phb4_pec_get_phb_id(pec, i);
         int stk_offset;
-
-        if (!pec->phbs[i]) {
-            continue;
-        }
 
         name = g_strdup_printf("stack@%x", i);
         stk_offset = fdt_add_subnode(fdt, offset, name);
@@ -253,8 +206,7 @@ static int pnv_pec_dt_xscom(PnvXScomInterface *dev, void *fdt,
         _FDT((fdt_setprop(fdt, stk_offset, "compatible", pecc->stk_compat,
                           pecc->stk_compat_size)));
         _FDT((fdt_setprop_cell(fdt, stk_offset, "reg", i)));
-        _FDT((fdt_setprop_cell(fdt, stk_offset, "ibm,phb-index",
-                               pec->phbs[i]->phb_id)));
+        _FDT((fdt_setprop_cell(fdt, stk_offset, "ibm,phb-index", phb_id)));
     }
 
     return 0;

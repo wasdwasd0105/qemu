@@ -151,8 +151,6 @@ struct VirtIOPCIProxy {
     bool disable_modern;
     bool ignore_backend_features;
     OnOffAuto disable_legacy;
-    /* Transitional device id */
-    uint16_t trans_devid;
     uint32_t class_code;
     uint32_t nvectors;
     uint32_t dfselect;
@@ -185,9 +183,6 @@ static inline void virtio_pci_disable_modern(VirtIOPCIProxy *proxy)
 {
     proxy->disable_modern = true;
 }
-
-uint16_t virtio_pci_get_trans_devid(uint16_t device_id);
-uint16_t virtio_pci_get_class_id(uint16_t device_id);
 
 /*
  * virtio-input-pci: This extends VirtioPCIProxy.
@@ -261,7 +256,5 @@ void virtio_pci_types_register(const VirtioPCIDeviceTypeInfo *t);
  * @fixed_queues.
  */
 unsigned virtio_pci_optimal_num_queues(unsigned fixed_queues);
-void virtio_pci_set_guest_notifier_fd_handler(VirtIODevice *vdev, VirtQueue *vq,
-                                              int n, bool assign,
-                                              bool with_irqfd);
+
 #endif

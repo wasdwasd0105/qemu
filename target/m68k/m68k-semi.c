@@ -20,8 +20,7 @@
 #include "qemu/osdep.h"
 
 #include "cpu.h"
-#include "gdbstub/syscalls.h"
-#include "gdbstub/helpers.h"
+#include "exec/gdbstub.h"
 #include "semihosting/syscalls.h"
 #include "semihosting/softmmu-uaccess.h"
 #include "hw/boards.h"

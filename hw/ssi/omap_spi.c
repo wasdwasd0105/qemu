@@ -134,9 +134,10 @@ void omap_mcspi_reset(struct omap_mcspi_s *s)
     omap_mcspi_interrupt_update(s);
 }
 
-static uint64_t omap_mcspi_read(void *opaque, hwaddr addr, unsigned size)
+static uint64_t omap_mcspi_read(void *opaque, hwaddr addr,
+                                unsigned size)
 {
-    struct omap_mcspi_s *s = opaque;
+    struct omap_mcspi_s *s = (struct omap_mcspi_s *) opaque;
     int ch = 0;
     uint32_t ret;
 
@@ -225,7 +226,7 @@ static uint64_t omap_mcspi_read(void *opaque, hwaddr addr, unsigned size)
 static void omap_mcspi_write(void *opaque, hwaddr addr,
                              uint64_t value, unsigned size)
 {
-    struct omap_mcspi_s *s = opaque;
+    struct omap_mcspi_s *s = (struct omap_mcspi_s *) opaque;
     int ch = 0;
 
     if (size != 4) {

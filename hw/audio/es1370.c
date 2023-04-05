@@ -29,7 +29,7 @@
 #include "qemu/osdep.h"
 #include "hw/audio/soundhw.h"
 #include "audio/audio.h"
-#include "hw/pci/pci_device.h"
+#include "hw/pci/pci.h"
 #include "migration/vmstate.h"
 #include "qemu/module.h"
 #include "sysemu/dma.h"
@@ -256,9 +256,6 @@ static void print_sctl (uint32_t val)
 #define lwarn(...)
 #endif
 
-#define TYPE_ES1370 "ES1370"
-OBJECT_DECLARE_SIMPLE_TYPE(ES1370State, ES1370)
-
 struct chan {
     uint32_t shift;
     uint32_t leftover;
@@ -281,6 +278,7 @@ struct ES1370State {
     uint32_t codec;
     uint32_t sctl;
 };
+typedef struct ES1370State ES1370State;
 
 struct chan_bits {
     uint32_t ctl_en;
@@ -293,6 +291,9 @@ struct chan_bits {
     void (*calc_freq) (ES1370State *s, uint32_t ctl,
                        uint32_t *old_freq, uint32_t *new_freq);
 };
+
+#define TYPE_ES1370 "ES1370"
+OBJECT_DECLARE_SIMPLE_TYPE(ES1370State, ES1370)
 
 static void es1370_dac1_calc_freq (ES1370State *s, uint32_t ctl,
                                    uint32_t *old_freq, uint32_t *new_freq);
@@ -843,8 +844,7 @@ static const VMStateDescription vmstate_es1370 = {
 
 static void es1370_on_reset(DeviceState *dev)
 {
-    ES1370State *s = ES1370(dev);
-
+    ES1370State *s = container_of(dev, ES1370State, dev.qdev);
     es1370_reset (s);
 }
 

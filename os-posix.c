@@ -272,7 +272,7 @@ void os_setup_post(void)
             error_report("not able to chdir to /: %s", strerror(errno));
             exit(1);
         }
-        fd = RETRY_ON_EINTR(qemu_open_old("/dev/null", O_RDWR));
+        TFR(fd = qemu_open_old("/dev/null", O_RDWR));
         if (fd == -1) {
             exit(1);
         }

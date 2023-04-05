@@ -20,7 +20,6 @@
 #include "hw/boards.h"
 #include "hw/riscv/shakti_c.h"
 #include "qapi/error.h"
-#include "qemu/error-report.h"
 #include "hw/intc/sifive_plic.h"
 #include "hw/intc/riscv_aclint.h"
 #include "sysemu/sysemu.h"

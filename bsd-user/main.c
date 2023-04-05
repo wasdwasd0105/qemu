@@ -18,10 +18,12 @@
  *  along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "qemu/osdep.h"
+#include <sys/types.h>
+#include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/sysctl.h>
 
+#include "qemu/osdep.h"
 #include "qemu/help-texts.h"
 #include "qemu/units.h"
 #include "qemu/accel.h"
@@ -44,7 +46,6 @@
 #include "trace/control.h"
 #include "crypto/init.h"
 #include "qemu/guest-random.h"
-#include "gdbstub/user.h"
 
 #include "host-os.h"
 #include "target_arch_cpu.h"

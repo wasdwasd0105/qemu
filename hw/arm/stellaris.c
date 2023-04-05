@@ -674,8 +674,9 @@ static void stellaris_i2c_init(Object *obj)
 #define STELLARIS_ADC_FIFO_FULL     0x1000
 
 #define TYPE_STELLARIS_ADC "stellaris-adc"
-typedef struct StellarisADCState StellarisADCState;
-DECLARE_INSTANCE_CHECKER(StellarisADCState, STELLARIS_ADC, TYPE_STELLARIS_ADC)
+typedef struct StellarisADCState stellaris_adc_state;
+DECLARE_INSTANCE_CHECKER(stellaris_adc_state, STELLARIS_ADC,
+                         TYPE_STELLARIS_ADC)
 
 struct StellarisADCState {
     SysBusDevice parent_obj;
@@ -699,7 +700,7 @@ struct StellarisADCState {
     qemu_irq irq[4];
 };
 
-static uint32_t stellaris_adc_fifo_read(StellarisADCState *s, int n)
+static uint32_t stellaris_adc_fifo_read(stellaris_adc_state *s, int n)
 {
     int tail;
 
@@ -715,7 +716,7 @@ static uint32_t stellaris_adc_fifo_read(StellarisADCState *s, int n)
     return s->fifo[n].data[tail];
 }
 
-static void stellaris_adc_fifo_write(StellarisADCState *s, int n,
+static void stellaris_adc_fifo_write(stellaris_adc_state *s, int n,
                                      uint32_t value)
 {
     int head;
@@ -735,7 +736,7 @@ static void stellaris_adc_fifo_write(StellarisADCState *s, int n,
         s->fifo[n].state |= STELLARIS_ADC_FIFO_FULL;
 }
 
-static void stellaris_adc_update(StellarisADCState *s)
+static void stellaris_adc_update(stellaris_adc_state *s)
 {
     int level;
     int n;
@@ -748,7 +749,7 @@ static void stellaris_adc_update(StellarisADCState *s)
 
 static void stellaris_adc_trigger(void *opaque, int irq, int level)
 {
-    StellarisADCState *s = opaque;
+    stellaris_adc_state *s = (stellaris_adc_state *)opaque;
     int n;
 
     for (n = 0; n < 4; n++) {
@@ -770,7 +771,7 @@ static void stellaris_adc_trigger(void *opaque, int irq, int level)
     }
 }
 
-static void stellaris_adc_reset(StellarisADCState *s)
+static void stellaris_adc_reset(stellaris_adc_state *s)
 {
     int n;
 
@@ -784,7 +785,7 @@ static void stellaris_adc_reset(StellarisADCState *s)
 static uint64_t stellaris_adc_read(void *opaque, hwaddr offset,
                                    unsigned size)
 {
-    StellarisADCState *s = opaque;
+    stellaris_adc_state *s = (stellaris_adc_state *)opaque;
 
     /* TODO: Implement this.  */
     if (offset >= 0x40 && offset < 0xc0) {
@@ -832,7 +833,7 @@ static uint64_t stellaris_adc_read(void *opaque, hwaddr offset,
 static void stellaris_adc_write(void *opaque, hwaddr offset,
                                 uint64_t value, unsigned size)
 {
-    StellarisADCState *s = opaque;
+    stellaris_adc_state *s = (stellaris_adc_state *)opaque;
 
     /* TODO: Implement this.  */
     if (offset >= 0x40 && offset < 0xc0) {
@@ -900,31 +901,31 @@ static const VMStateDescription vmstate_stellaris_adc = {
     .version_id = 1,
     .minimum_version_id = 1,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT32(actss, StellarisADCState),
-        VMSTATE_UINT32(ris, StellarisADCState),
-        VMSTATE_UINT32(im, StellarisADCState),
-        VMSTATE_UINT32(emux, StellarisADCState),
-        VMSTATE_UINT32(ostat, StellarisADCState),
-        VMSTATE_UINT32(ustat, StellarisADCState),
-        VMSTATE_UINT32(sspri, StellarisADCState),
-        VMSTATE_UINT32(sac, StellarisADCState),
-        VMSTATE_UINT32(fifo[0].state, StellarisADCState),
-        VMSTATE_UINT32_ARRAY(fifo[0].data, StellarisADCState, 16),
-        VMSTATE_UINT32(ssmux[0], StellarisADCState),
-        VMSTATE_UINT32(ssctl[0], StellarisADCState),
-        VMSTATE_UINT32(fifo[1].state, StellarisADCState),
-        VMSTATE_UINT32_ARRAY(fifo[1].data, StellarisADCState, 16),
-        VMSTATE_UINT32(ssmux[1], StellarisADCState),
-        VMSTATE_UINT32(ssctl[1], StellarisADCState),
-        VMSTATE_UINT32(fifo[2].state, StellarisADCState),
-        VMSTATE_UINT32_ARRAY(fifo[2].data, StellarisADCState, 16),
-        VMSTATE_UINT32(ssmux[2], StellarisADCState),
-        VMSTATE_UINT32(ssctl[2], StellarisADCState),
-        VMSTATE_UINT32(fifo[3].state, StellarisADCState),
-        VMSTATE_UINT32_ARRAY(fifo[3].data, StellarisADCState, 16),
-        VMSTATE_UINT32(ssmux[3], StellarisADCState),
-        VMSTATE_UINT32(ssctl[3], StellarisADCState),
-        VMSTATE_UINT32(noise, StellarisADCState),
+        VMSTATE_UINT32(actss, stellaris_adc_state),
+        VMSTATE_UINT32(ris, stellaris_adc_state),
+        VMSTATE_UINT32(im, stellaris_adc_state),
+        VMSTATE_UINT32(emux, stellaris_adc_state),
+        VMSTATE_UINT32(ostat, stellaris_adc_state),
+        VMSTATE_UINT32(ustat, stellaris_adc_state),
+        VMSTATE_UINT32(sspri, stellaris_adc_state),
+        VMSTATE_UINT32(sac, stellaris_adc_state),
+        VMSTATE_UINT32(fifo[0].state, stellaris_adc_state),
+        VMSTATE_UINT32_ARRAY(fifo[0].data, stellaris_adc_state, 16),
+        VMSTATE_UINT32(ssmux[0], stellaris_adc_state),
+        VMSTATE_UINT32(ssctl[0], stellaris_adc_state),
+        VMSTATE_UINT32(fifo[1].state, stellaris_adc_state),
+        VMSTATE_UINT32_ARRAY(fifo[1].data, stellaris_adc_state, 16),
+        VMSTATE_UINT32(ssmux[1], stellaris_adc_state),
+        VMSTATE_UINT32(ssctl[1], stellaris_adc_state),
+        VMSTATE_UINT32(fifo[2].state, stellaris_adc_state),
+        VMSTATE_UINT32_ARRAY(fifo[2].data, stellaris_adc_state, 16),
+        VMSTATE_UINT32(ssmux[2], stellaris_adc_state),
+        VMSTATE_UINT32(ssctl[2], stellaris_adc_state),
+        VMSTATE_UINT32(fifo[3].state, stellaris_adc_state),
+        VMSTATE_UINT32_ARRAY(fifo[3].data, stellaris_adc_state, 16),
+        VMSTATE_UINT32(ssmux[3], stellaris_adc_state),
+        VMSTATE_UINT32(ssctl[3], stellaris_adc_state),
+        VMSTATE_UINT32(noise, stellaris_adc_state),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -932,7 +933,7 @@ static const VMStateDescription vmstate_stellaris_adc = {
 static void stellaris_adc_init(Object *obj)
 {
     DeviceState *dev = DEVICE(obj);
-    StellarisADCState *s = STELLARIS_ADC(obj);
+    stellaris_adc_state *s = STELLARIS_ADC(obj);
     SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
     int n;
 
@@ -1146,14 +1147,9 @@ static void stellaris_init(MachineState *ms, stellaris_board_info *board)
 
     for (i = 0; i < 4; i++) {
         if (board->dc2 & (1 << i)) {
-            SysBusDevice *sbd;
-
-            dev = qdev_new("pl011_luminary");
-            sbd = SYS_BUS_DEVICE(dev);
-            qdev_prop_set_chr(dev, "chardev", serial_hd(i));
-            sysbus_realize_and_unref(sbd, &error_fatal);
-            sysbus_mmio_map(sbd, 0, 0x4000c000 + i * 0x1000);
-            sysbus_connect_irq(sbd, 0, qdev_get_gpio_in(nvic, uart_irq[i]));
+            pl011_luminary_create(0x4000c000 + i * 0x1000,
+                                  qdev_get_gpio_in(nvic, uart_irq[i]),
+                                  serial_hd(i));
         }
     }
     if (board->dc2 & (1 << 4)) {
@@ -1385,7 +1381,7 @@ static void stellaris_adc_class_init(ObjectClass *klass, void *data)
 static const TypeInfo stellaris_adc_info = {
     .name          = TYPE_STELLARIS_ADC,
     .parent        = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(StellarisADCState),
+    .instance_size = sizeof(stellaris_adc_state),
     .instance_init = stellaris_adc_init,
     .class_init    = stellaris_adc_class_init,
 };

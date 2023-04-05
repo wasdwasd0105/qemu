@@ -3,6 +3,5 @@ mips_softmmu_ss.add(files(
   'cp0.c',
   'cp0_timer.c',
   'machine.c',
-  'mips-qmp-cmds.c',
   'physaddr.c',
 ))

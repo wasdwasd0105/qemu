@@ -12,7 +12,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/error-report.h"
 #include "qemu/units.h"
 #include "qemu/iov.h"
 #include "ui/console.h"
@@ -22,6 +21,7 @@
 #include "exec/ramblock.h"
 #include "sysemu/hostmem.h"
 #include <sys/ioctl.h>
+#include <fcntl.h>
 #include <linux/memfd.h>
 #include "qemu/memfd.h"
 #include "standard-headers/linux/udmabuf.h"

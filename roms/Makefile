@@ -57,6 +57,7 @@ default help:
 	@echo "available build targets:"
 	@echo "  bios               -- update bios.bin (seabios)"
 	@echo "  vgabios            -- update vgabios binaries (seabios)"
+	@echo "  sgabios            -- update sgabios binaries"
 	@echo "  pxerom             -- update nic roms (bios only)"
 	@echo "  efirom             -- update nic roms (bios+efi)"
 	@echo "  slof               -- update slof.bin"
@@ -101,7 +102,11 @@ build-seabios-config-%: config.%
 		OUT=$(CURDIR)/seabios/builds/$*/ all
 
 
-.PHONY: skiboot qboot
+.PHONY: sgabios skiboot qboot
+sgabios:
+	$(MAKE) -C sgabios
+	cp sgabios/sgabios.bin ../pc-bios
+
 
 pxerom: $(patsubst %,pxe-rom-%,$(pxerom_variants))
 
@@ -126,6 +131,25 @@ build-efi-roms: build-pxe-roms
 		CROSS_COMPILE=$(x86_64_cross_prefix) \
 		$(patsubst %,bin-x86_64-efi/%.efidrv,$(pxerom_targets))
 
+# Build scripts can pass compiler/linker flags to the EDK2
+# build tools via the EDK2_BASETOOLS_OPTFLAGS (CFLAGS) and
+# EDK2_BASETOOLS_LDFLAGS (LDFLAGS) environment variables.
+#
+# Example:
+#
+#  make -C roms \
+#    EDK2_BASETOOLS_OPTFLAGS='...' \
+#    EDK2_BASETOOLS_LDFLAGS='...' \
+#    efirom
+#
+edk2-basetools:
+	cd edk2/BaseTools && git submodule update --init --force \
+		Source/C/BrotliCompress/brotli
+	$(MAKE) -C edk2/BaseTools \
+		PYTHON_COMMAND=$${EDK2_PYTHON_COMMAND:-python3} \
+		EXTRA_OPTFLAGS='$(EDK2_BASETOOLS_OPTFLAGS)' \
+		EXTRA_LDFLAGS='$(EDK2_BASETOOLS_LDFLAGS)'
+
 slof:
 	$(MAKE) -C SLOF CROSS=$(powerpc64_cross_prefix) qemu
 	cp SLOF/boot_rom.bin ../pc-bios/slof.bin
@@ -146,12 +170,8 @@ skiboot:
 	$(MAKE) -C skiboot CROSS=$(powerpc64_cross_prefix)
 	cp skiboot/skiboot.lid ../pc-bios/skiboot.lid
 
-efi:
-	python3 edk2-build.py --config edk2-build.config \
-		--version-override "edk2-stable202302-for-qemu" \
-		--release-date "03/01/2023"
-	rm -f ../pc-bios/edk2-*.fd.bz2
-	bzip2 --verbose ../pc-bios/edk2-*.fd
+efi: edk2-basetools
+	$(MAKE) -f Makefile.edk2
 
 opensbi32-generic:
 	$(MAKE) -C opensbi \
@@ -179,13 +199,15 @@ npcm7xx_bootrom:
 
 clean:
 	rm -rf seabios/.config seabios/out seabios/builds
+	$(MAKE) -C sgabios clean
+	rm -f sgabios/.depend
 	$(MAKE) -C ipxe/src veryclean
 	$(MAKE) -C edk2/BaseTools clean
 	$(MAKE) -C SLOF clean
 	rm -rf u-boot/build-e500
 	$(MAKE) -C u-boot-sam460ex distclean
 	$(MAKE) -C skiboot clean
-	rm -rf Build
+	$(MAKE) -f Makefile.edk2 clean
 	$(MAKE) -C opensbi clean
 	$(MAKE) -C qboot clean
 	$(MAKE) -C vbootrom clean

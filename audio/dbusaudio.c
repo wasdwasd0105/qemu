@@ -43,7 +43,6 @@
 
 typedef struct DBusAudio {
     GDBusObjectManagerServer *server;
-    bool p2p;
     GDBusObjectSkeleton *audio;
     QemuDBusDisplay1Audio *iface;
     GHashTable *out_listeners;
@@ -449,8 +448,7 @@ dbus_audio_register_listener(AudioState *s,
                              bool out)
 {
     DBusAudio *da = s->drv_opaque;
-    const char *sender =
-        da->p2p ? "p2p" : g_dbus_method_invocation_get_sender(invocation);
+    const char *sender = g_dbus_method_invocation_get_sender(invocation);
     g_autoptr(GDBusConnection) listener_conn = NULL;
     g_autoptr(GError) err = NULL;
     g_autoptr(GSocket) socket = NULL;
@@ -593,7 +591,7 @@ dbus_audio_register_in_listener(AudioState *s,
 }
 
 static void
-dbus_audio_set_server(AudioState *s, GDBusObjectManagerServer *server, bool p2p)
+dbus_audio_set_server(AudioState *s, GDBusObjectManagerServer *server)
 {
     DBusAudio *da = s->drv_opaque;
 
@@ -601,7 +599,6 @@ dbus_audio_set_server(AudioState *s, GDBusObjectManagerServer *server, bool p2p)
     g_assert(!da->server);
 
     da->server = g_object_ref(server);
-    da->p2p = p2p;
 
     da->audio = g_dbus_object_skeleton_new(DBUS_DISPLAY1_AUDIO_PATH);
     da->iface = qemu_dbus_display1_audio_skeleton_new();

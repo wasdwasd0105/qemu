@@ -36,7 +36,6 @@
 #include "qapi/qapi-commands-machine.h"
 #include "qapi/qapi-commands-misc.h"
 #include "qemu/cutils.h"
-#include "qemu/error-report.h"
 #include "qemu/main-loop.h"
 
 #include "ui/console.h"
@@ -54,6 +53,7 @@
 #include <math.h>
 
 #include "trace.h"
+#include "qemu/cutils.h"
 #include "ui/input.h"
 #include "sysemu/runstate.h"
 #include "sysemu/sysemu.h"
@@ -450,8 +450,7 @@ static void gd_mouse_set(DisplayChangeListener *dcl,
     GdkDisplay *dpy;
     gint x_root, y_root;
 
-    if (!gtk_widget_get_realized(vc->gfx.drawing_area) ||
-        qemu_input_is_absolute()) {
+    if (qemu_input_is_absolute()) {
         return;
     }
 
@@ -1784,9 +1783,7 @@ static void gd_vc_chr_accept_input(Chardev *chr)
     VCChardev *vcd = VC_CHARDEV(chr);
     VirtualConsole *vc = vcd->console;
 
-    if (vc) {
-        gd_vc_send_chars(vc);
-    }
+    gd_vc_send_chars(vc);
 }
 
 static void gd_vc_chr_set_echo(Chardev *chr, bool echo)

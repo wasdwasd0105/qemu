@@ -18,7 +18,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "exec/address-spaces.h"
 #include "hw/irq.h"
 #include "target/ppc/cpu.h"
 #include "qemu/log.h"

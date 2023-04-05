@@ -74,10 +74,6 @@ class KernelDocDirective(Directive):
         # Sphinx versions
         cmd += ['-sphinx-version', sphinx.__version__]
 
-        # Pass through the warnings-as-errors flag
-        if env.config.kerneldoc_werror:
-            cmd += ['-Werror']
-
         filename = env.config.kerneldoc_srctree + '/' + self.arguments[0]
         export_file_patterns = []
 
@@ -171,7 +167,6 @@ def setup(app):
     app.add_config_value('kerneldoc_bin', None, 'env')
     app.add_config_value('kerneldoc_srctree', None, 'env')
     app.add_config_value('kerneldoc_verbosity', 1, 'env')
-    app.add_config_value('kerneldoc_werror', 0, 'env')
 
     app.add_directive('kernel-doc', KernelDocDirective)
 

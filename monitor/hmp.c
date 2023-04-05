@@ -27,6 +27,7 @@
 #include "hw/qdev-core.h"
 #include "monitor-internal.h"
 #include "monitor/hmp.h"
+#include "qapi/error.h"
 #include "qapi/qmp/qdict.h"
 #include "qapi/qmp/qnum.h"
 #include "qemu/config-file.h"
@@ -36,6 +37,7 @@
 #include "qemu/option.h"
 #include "qemu/units.h"
 #include "sysemu/block-backend.h"
+#include "sysemu/runstate.h"
 #include "trace.h"
 
 static void monitor_command_cb(void *opaque, const char *cmdline,
@@ -272,7 +274,7 @@ static void help_cmd_dump(Monitor *mon, const HMPCommand *cmds,
     }
 }
 
-void hmp_help_cmd(Monitor *mon, const char *name)
+void help_cmd(Monitor *mon, const char *name)
 {
     char *args[MAX_ARGS];
     int nb_args = 0;
@@ -1189,7 +1191,9 @@ static void cmd_completion(MonitorHMP *mon, const char *name, const char *list)
         }
         memcpy(cmd, pstart, len);
         cmd[len] = '\0';
-        readline_add_completion_of(mon->rs, name, cmd);
+        if (name[0] == '\0' || !strncmp(name, cmd, strlen(name))) {
+            readline_add_completion(mon->rs, cmd);
+        }
         if (*p == '\0') {
             break;
         }
@@ -1268,7 +1272,7 @@ static void monitor_find_completion_by_table(MonitorHMP *mon,
 {
     const char *cmdname;
     int i;
-    const char *ptype, *old_ptype, *str;
+    const char *ptype, *old_ptype, *str, *name;
     const HMPCommand *cmd;
     BlockBackend *blk = NULL;
 
@@ -1333,7 +1337,11 @@ static void monitor_find_completion_by_table(MonitorHMP *mon,
             /* block device name completion */
             readline_set_completion_index(mon->rs, strlen(str));
             while ((blk = blk_next(blk)) != NULL) {
-                readline_add_completion_of(mon->rs, str, blk_name(blk));
+                name = blk_name(blk);
+                if (str[0] == '\0' ||
+                    !strncmp(name, str, strlen(str))) {
+                    readline_add_completion(mon->rs, name);
+                }
             }
             break;
         case 's':

@@ -165,9 +165,9 @@ static int64_t block_status(BDRVParallelsState *s, int64_t sector_num,
     return start_off;
 }
 
-static int64_t coroutine_fn GRAPH_RDLOCK
-allocate_clusters(BlockDriverState *bs, int64_t sector_num,
-                  int nb_sectors, int *pnum)
+static coroutine_fn int64_t allocate_clusters(BlockDriverState *bs,
+                                              int64_t sector_num,
+                                              int nb_sectors, int *pnum)
 {
     int ret = 0;
     BDRVParallelsState *s = bs->opaque;
@@ -261,8 +261,7 @@ allocate_clusters(BlockDriverState *bs, int64_t sector_num,
 }
 
 
-static int coroutine_fn GRAPH_RDLOCK
-parallels_co_flush_to_os(BlockDriverState *bs)
+static coroutine_fn int parallels_co_flush_to_os(BlockDriverState *bs)
 {
     BDRVParallelsState *s = bs->opaque;
     unsigned long size = DIV_ROUND_UP(s->header_size, s->bat_dirty_block);
@@ -321,9 +320,9 @@ static int coroutine_fn parallels_co_block_status(BlockDriverState *bs,
     return BDRV_BLOCK_DATA | BDRV_BLOCK_OFFSET_VALID;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-parallels_co_writev(BlockDriverState *bs, int64_t sector_num, int nb_sectors,
-                    QEMUIOVector *qiov, int flags)
+static coroutine_fn int parallels_co_writev(BlockDriverState *bs,
+                                            int64_t sector_num, int nb_sectors,
+                                            QEMUIOVector *qiov, int flags)
 {
     BDRVParallelsState *s = bs->opaque;
     uint64_t bytes_done = 0;
@@ -364,9 +363,8 @@ parallels_co_writev(BlockDriverState *bs, int64_t sector_num, int nb_sectors,
     return ret;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-parallels_co_readv(BlockDriverState *bs, int64_t sector_num, int nb_sectors,
-                   QEMUIOVector *qiov)
+static coroutine_fn int parallels_co_readv(BlockDriverState *bs,
+        int64_t sector_num, int nb_sectors, QEMUIOVector *qiov)
 {
     BDRVParallelsState *s = bs->opaque;
     uint64_t bytes_done = 0;
@@ -416,9 +414,9 @@ parallels_co_readv(BlockDriverState *bs, int64_t sector_num, int nb_sectors,
 }
 
 
-static int coroutine_fn GRAPH_RDLOCK
-parallels_co_check(BlockDriverState *bs, BdrvCheckResult *res,
-                   BdrvCheckMode fix)
+static int coroutine_fn parallels_co_check(BlockDriverState *bs,
+                                           BdrvCheckResult *res,
+                                           BdrvCheckMode fix)
 {
     BDRVParallelsState *s = bs->opaque;
     int64_t size, prev_off, high_off;
@@ -567,13 +565,13 @@ static int coroutine_fn parallels_co_create(BlockdevCreateOptions* opts,
     }
 
     /* Create BlockBackend to write to the image */
-    bs = bdrv_co_open_blockdev_ref(parallels_opts->file, errp);
+    bs = bdrv_open_blockdev_ref(parallels_opts->file, errp);
     if (bs == NULL) {
         return -EIO;
     }
 
-    blk = blk_co_new_with_bs(bs, BLK_PERM_WRITE | BLK_PERM_RESIZE, BLK_PERM_ALL,
-                             errp);
+    blk = blk_new_with_bs(bs, BLK_PERM_WRITE | BLK_PERM_RESIZE, BLK_PERM_ALL,
+                          errp);
     if (!blk) {
         ret = -EPERM;
         goto out;
@@ -622,9 +620,10 @@ exit:
     goto out;
 }
 
-static int coroutine_fn GRAPH_RDLOCK
-parallels_co_create_opts(BlockDriver *drv, const char *filename,
-                         QemuOpts *opts, Error **errp)
+static int coroutine_fn parallels_co_create_opts(BlockDriver *drv,
+                                                 const char *filename,
+                                                 QemuOpts *opts,
+                                                 Error **errp)
 {
     BlockdevCreateOptions *create_options = NULL;
     BlockDriverState *bs = NULL;
@@ -647,13 +646,13 @@ parallels_co_create_opts(BlockDriver *drv, const char *filename,
     }
 
     /* Create and open the file (protocol layer) */
-    ret = bdrv_co_create_file(filename, opts, errp);
+    ret = bdrv_create_file(filename, opts, errp);
     if (ret < 0) {
         goto done;
     }
 
-    bs = bdrv_co_open(filename, NULL, NULL,
-                      BDRV_O_RDWR | BDRV_O_RESIZE | BDRV_O_PROTOCOL, errp);
+    bs = bdrv_open(filename, NULL, NULL,
+                   BDRV_O_RDWR | BDRV_O_RESIZE | BDRV_O_PROTOCOL, errp);
     if (bs == NULL) {
         ret = -EIO;
         goto done;

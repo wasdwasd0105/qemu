@@ -376,12 +376,8 @@ void replay_finish(void)
     replay_mode = REPLAY_MODE_NONE;
 }
 
-void replay_add_blocker(const char *feature)
+void replay_add_blocker(Error *reason)
 {
-    Error *reason = NULL;
-
-    error_setg(&reason, "Record/replay feature is not supported for '%s'",
-               feature);
     replay_blockers = g_slist_prepend(replay_blockers, reason);
 }
 

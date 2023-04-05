@@ -11,7 +11,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/error-report.h"
 #include <zlib.h>
 #include "qapi/error.h"
 #include "cpu.h"
@@ -112,6 +111,7 @@ static void global_dirty_log_sync(unsigned int flag, bool one_shot)
 static DirtyPageRecord *vcpu_dirty_stat_alloc(VcpuStat *stat)
 {
     CPUState *cpu;
+    DirtyPageRecord *records;
     int nvcpu = 0;
 
     CPU_FOREACH(cpu) {
@@ -121,7 +121,9 @@ static DirtyPageRecord *vcpu_dirty_stat_alloc(VcpuStat *stat)
     stat->nvcpu = nvcpu;
     stat->rates = g_new0(DirtyRateVcpu, nvcpu);
 
-    return g_new0(DirtyPageRecord, nvcpu);
+    records = g_new0(DirtyPageRecord, nvcpu);
+
+    return records;
 }
 
 static void vcpu_dirty_stat_collect(VcpuStat *stat,
@@ -471,6 +473,7 @@ find_block_matched(RAMBlock *block, int count,
                   struct RamblockDirtyInfo *infos)
 {
     int i;
+    struct RamblockDirtyInfo *matched;
 
     for (i = 0; i < count; i++) {
         if (!strcmp(infos[i].idstr, qemu_ram_get_idstr(block))) {
@@ -489,7 +492,9 @@ find_block_matched(RAMBlock *block, int count,
         return NULL;
     }
 
-    return &infos[i];
+    matched = &infos[i];
+
+    return matched;
 }
 
 static bool compare_page_hash_info(struct RamblockDirtyInfo *info,
@@ -715,8 +720,8 @@ void qmp_calc_dirty_rate(int64_t calc_time,
         mode =  DIRTY_RATE_MEASURE_MODE_PAGE_SAMPLING;
     }
 
-    if (has_sample_pages && mode != DIRTY_RATE_MEASURE_MODE_PAGE_SAMPLING) {
-        error_setg(errp, "sample-pages is used only in page-sampling mode");
+    if (has_sample_pages && mode == DIRTY_RATE_MEASURE_MODE_DIRTY_RING) {
+        error_setg(errp, "either sample-pages or dirty-ring can be specified.");
         return;
     }
 
@@ -786,10 +791,8 @@ void hmp_info_dirty_rate(Monitor *mon, const QDict *qdict)
                    DirtyRateStatus_str(info->status));
     monitor_printf(mon, "Start Time: %"PRIi64" (ms)\n",
                    info->start_time);
-    if (info->mode == DIRTY_RATE_MEASURE_MODE_PAGE_SAMPLING) {
-        monitor_printf(mon, "Sample Pages: %"PRIu64" (per GB)\n",
-                       info->sample_pages);
-    }
+    monitor_printf(mon, "Sample Pages: %"PRIu64" (per GB)\n",
+                   info->sample_pages);
     monitor_printf(mon, "Period: %"PRIi64" (sec)\n",
                    info->calc_time);
     monitor_printf(mon, "Mode: %s\n",

@@ -50,14 +50,10 @@
 #
 # Enumeration of statistics providers.
 #
-# @kvm: since 7.1
-#
-# @cryptodev: since 8.0
-#
 # Since: 7.1
 ##
 { 'enum': 'StatsProvider',
-  'data': [ 'kvm', 'cryptodev' ] }
+  'data': [ 'kvm' ] }
 
 ##
 # @StatsTarget:
@@ -69,12 +65,10 @@
 #
 # @vcpu: statistics that apply to a single virtual CPU.
 #
-# @cryptodev: statistics that apply to a crypto device. since 8.0
-#
 # Since: 7.1
 ##
 { 'enum': 'StatsTarget',
-  'data': [ 'vm', 'vcpu', 'cryptodev' ] }
+  'data': [ 'vm', 'vcpu' ] }
 
 ##
 # @StatsRequest:

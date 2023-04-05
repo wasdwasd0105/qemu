@@ -41,7 +41,6 @@
 #include "hw/qdev-properties.h"
 #include "hw/s390x/tod.h"
 #include "sysemu/sysemu.h"
-#include "sysemu/cpus.h"
 #include "hw/s390x/pv.h"
 #include "migration/blocker.h"
 #include "qapi/visitor.h"
@@ -119,7 +118,7 @@ static void subsystem_reset(void)
     for (i = 0; i < ARRAY_SIZE(reset_dev_types); i++) {
         dev = DEVICE(object_resolve_path_type("", reset_dev_types[i], NULL));
         if (dev) {
-            device_cold_reset(dev);
+            qdev_reset_all(dev);
         }
     }
 }
@@ -330,9 +329,7 @@ static inline void s390_do_cpu_ipl(CPUState *cs, run_on_cpu_data arg)
 
 static void s390_machine_unprotect(S390CcwMachineState *ms)
 {
-    if (!s390_pv_vm_try_disable_async()) {
-        s390_pv_vm_disable();
-    }
+    s390_pv_vm_disable();
     ms->pv = false;
     migrate_del_blocker(pv_mig_blocker);
     error_free_or_abort(&pv_mig_blocker);
@@ -826,26 +823,14 @@ bool css_migration_enabled(void)
     }                                                                         \
     type_init(ccw_machine_register_##suffix)
 
-static void ccw_machine_8_0_instance_options(MachineState *machine)
-{
-}
-
-static void ccw_machine_8_0_class_options(MachineClass *mc)
-{
-}
-DEFINE_CCW_MACHINE(8_0, "8.0", true);
-
 static void ccw_machine_7_2_instance_options(MachineState *machine)
 {
-    ccw_machine_8_0_instance_options(machine);
 }
 
 static void ccw_machine_7_2_class_options(MachineClass *mc)
 {
-    ccw_machine_8_0_class_options(mc);
-    compat_props_add(mc->compat_props, hw_compat_7_2, hw_compat_7_2_len);
 }
-DEFINE_CCW_MACHINE(7_2, "7.2", false);
+DEFINE_CCW_MACHINE(7_2, "7.2", true);
 
 static void ccw_machine_7_1_instance_options(MachineState *machine)
 {

@@ -159,6 +159,7 @@ struct VncDisplay
     QKbdState *kbd;
     QemuMutex mutex;
 
+    QEMUCursor *cursor;
     int cursor_msize;
     uint8_t *cursor_mask;
 

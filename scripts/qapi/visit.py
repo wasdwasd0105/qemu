@@ -71,16 +71,6 @@ bool visit_type_%(c_name)s_members(Visitor *v, %(c_name)s *obj, Error **errp)
 ''',
                 c_name=c_name(name))
 
-    sep = ''
-    for memb in members:
-        if memb.optional and not memb.need_has():
-            ret += mcgen('''
-    bool has_%(c_name)s = !!obj->%(c_name)s;
-''',
-                         c_name=c_name(memb.name))
-            sep = '\n'
-    ret += sep
-
     if base:
         ret += mcgen('''
     if (!visit_type_%(c_type)s_members(v, (%(c_type)s *)obj, errp)) {
@@ -92,13 +82,10 @@ bool visit_type_%(c_name)s_members(Visitor *v, %(c_name)s *obj, Error **errp)
     for memb in members:
         ret += memb.ifcond.gen_if()
         if memb.optional:
-            has = 'has_' + c_name(memb.name)
-            if memb.need_has():
-                has = 'obj->' + has
             ret += mcgen('''
-    if (visit_optional(v, "%(name)s", &%(has)s)) {
+    if (visit_optional(v, "%(name)s", &obj->has_%(c_name)s)) {
 ''',
-                         name=memb.name, has=has)
+                         name=memb.name, c_name=c_name(memb.name))
             indent.increase()
         special_features = gen_special_features(memb.features)
         if special_features != '0':

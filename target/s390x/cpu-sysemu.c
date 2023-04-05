@@ -21,7 +21,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/error-report.h"
 #include "qapi/error.h"
 #include "cpu.h"
 #include "s390x-internal.h"

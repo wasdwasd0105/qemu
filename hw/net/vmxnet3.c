@@ -440,19 +440,19 @@ vmxnet3_setup_tx_offloads(VMXNET3State *s)
 {
     switch (s->offload_mode) {
     case VMXNET3_OM_NONE:
-        return net_tx_pkt_build_vheader(s->tx_pkt, false, false, 0);
+        net_tx_pkt_build_vheader(s->tx_pkt, false, false, 0);
+        break;
 
     case VMXNET3_OM_CSUM:
+        net_tx_pkt_build_vheader(s->tx_pkt, false, true, 0);
         VMW_PKPRN("L4 CSO requested\n");
-        return net_tx_pkt_build_vheader(s->tx_pkt, false, true, 0);
+        break;
 
     case VMXNET3_OM_TSO:
-        VMW_PKPRN("GSO offload requested.");
-        if (!net_tx_pkt_build_vheader(s->tx_pkt, true, true,
-            s->cso_or_gso_size)) {
-            return false;
-        }
+        net_tx_pkt_build_vheader(s->tx_pkt, true, true,
+            s->cso_or_gso_size);
         net_tx_pkt_update_ip_checksums(s->tx_pkt);
+        VMW_PKPRN("GSO offload requested.");
         break;
 
     default:
@@ -847,20 +847,21 @@ static void vmxnet3_rx_need_csum_calculate(struct NetRxPkt *pkt,
                                            size_t pkt_len)
 {
     struct virtio_net_hdr *vhdr;
-    bool hasip4, hasip6;
-    EthL4HdrProto l4hdr_proto;
+    bool isip4, isip6, istcp, isudp;
     uint8_t *data;
     int len;
+
+    if (!net_rx_pkt_has_virt_hdr(pkt)) {
+        return;
+    }
 
     vhdr = net_rx_pkt_get_vhdr(pkt);
     if (!VMXNET_FLAG_IS_SET(vhdr->flags, VIRTIO_NET_HDR_F_NEEDS_CSUM)) {
         return;
     }
 
-    net_rx_pkt_get_protocols(pkt, &hasip4, &hasip6, &l4hdr_proto);
-    if (!(hasip4 || hasip6) ||
-        (l4hdr_proto != ETH_L4_HDR_PROTO_TCP &&
-         l4hdr_proto != ETH_L4_HDR_PROTO_UDP)) {
+    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
+    if (!(isip4 || isip6) || !(istcp || isudp)) {
         return;
     }
 
@@ -888,14 +889,17 @@ static void vmxnet3_rx_update_descr(struct NetRxPkt *pkt,
     struct Vmxnet3_RxCompDesc *rxcd)
 {
     int csum_ok, is_gso;
-    bool hasip4, hasip6;
-    EthL4HdrProto l4hdr_proto;
+    bool isip4, isip6, istcp, isudp;
     struct virtio_net_hdr *vhdr;
     uint8_t offload_type;
 
     if (net_rx_pkt_is_vlan_stripped(pkt)) {
         rxcd->ts = 1;
         rxcd->tci = net_rx_pkt_get_vlan_tag(pkt);
+    }
+
+    if (!net_rx_pkt_has_virt_hdr(pkt)) {
+        goto nocsum;
     }
 
     vhdr = net_rx_pkt_get_vhdr(pkt);
@@ -915,18 +919,16 @@ static void vmxnet3_rx_update_descr(struct NetRxPkt *pkt,
         goto nocsum;
     }
 
-    net_rx_pkt_get_protocols(pkt, &hasip4, &hasip6, &l4hdr_proto);
-    if ((l4hdr_proto != ETH_L4_HDR_PROTO_TCP &&
-         l4hdr_proto != ETH_L4_HDR_PROTO_UDP) ||
-        (!hasip4 && !hasip6)) {
+    net_rx_pkt_get_protocols(pkt, &isip4, &isip6, &isudp, &istcp);
+    if ((!istcp && !isudp) || (!isip4 && !isip6)) {
         goto nocsum;
     }
 
     rxcd->cnc = 0;
-    rxcd->v4 = hasip4 ? 1 : 0;
-    rxcd->v6 = hasip6 ? 1 : 0;
-    rxcd->tcp = l4hdr_proto == ETH_L4_HDR_PROTO_TCP;
-    rxcd->udp = l4hdr_proto == ETH_L4_HDR_PROTO_UDP;
+    rxcd->v4 = isip4 ? 1 : 0;
+    rxcd->v6 = isip6 ? 1 : 0;
+    rxcd->tcp = istcp ? 1 : 0;
+    rxcd->udp = isudp ? 1 : 0;
     rxcd->fcs = rxcd->tuc = rxcd->ipc = 1;
     return;
 
@@ -1439,7 +1441,7 @@ static void vmxnet3_activate_device(VMXNET3State *s)
     vmxnet3_setup_rx_filtering(s);
     /* Cache fields from shared memory */
     s->mtu = VMXNET3_READ_DRV_SHARED32(d, s->drv_shmem, devRead.misc.mtu);
-    assert(VMXNET3_MIN_MTU <= s->mtu && s->mtu <= VMXNET3_MAX_MTU);
+    assert(VMXNET3_MIN_MTU <= s->mtu && s->mtu < VMXNET3_MAX_MTU);
     VMW_CFPRN("MTU is %u", s->mtu);
 
     s->max_rx_frags =
@@ -1519,8 +1521,9 @@ static void vmxnet3_activate_device(VMXNET3State *s)
 
     /* Preallocate TX packet wrapper */
     VMW_CFPRN("Max TX fragments is %u", s->max_tx_frags);
-    net_tx_pkt_init(&s->tx_pkt, PCI_DEVICE(s), s->max_tx_frags);
-    net_rx_pkt_init(&s->rx_pkt);
+    net_tx_pkt_init(&s->tx_pkt, PCI_DEVICE(s),
+                    s->max_tx_frags, s->peer_has_vhdr);
+    net_rx_pkt_init(&s->rx_pkt, s->peer_has_vhdr);
 
     /* Read rings memory locations for RX queues */
     for (i = 0; i < s->rxq_num; i++) {
@@ -2399,8 +2402,9 @@ static int vmxnet3_post_load(void *opaque, int version_id)
 {
     VMXNET3State *s = opaque;
 
-    net_tx_pkt_init(&s->tx_pkt, PCI_DEVICE(s), s->max_tx_frags);
-    net_rx_pkt_init(&s->rx_pkt);
+    net_tx_pkt_init(&s->tx_pkt, PCI_DEVICE(s),
+                    s->max_tx_frags, s->peer_has_vhdr);
+    net_rx_pkt_init(&s->rx_pkt, s->peer_has_vhdr);
 
     if (s->msix_used) {
         vmxnet3_use_msix_vectors(s, VMXNET3_MAX_INTRS);

@@ -121,7 +121,7 @@ def build_params(arg_type: Optional[QAPISchemaObjectType],
         for memb in arg_type.members:
             ret += sep
             sep = ', '
-            if memb.need_has():
+            if memb.optional:
                 ret += 'bool has_%s, ' % c_name(memb.name)
             ret += '%s %s' % (memb.type.c_param_type(),
                               c_name(memb.name))

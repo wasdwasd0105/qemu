@@ -10,7 +10,6 @@ softmmu_ss.add(files(
   'filter-rewriter.c',
   'filter.c',
   'hub.c',
-  'net-hmp-cmds.c',
   'net.c',
   'queue.c',
   'socket.c',

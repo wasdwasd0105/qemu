@@ -122,6 +122,9 @@ static void gen_revb_2h(TCGv dest, TCGv src1)
     tcg_gen_and_tl(t1, src1, mask);
     tcg_gen_shli_tl(t1, t1, 8);
     tcg_gen_or_tl(dest, t0, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
 }
 
 static void gen_revb_4h(TCGv dest, TCGv src1)
@@ -135,6 +138,9 @@ static void gen_revb_4h(TCGv dest, TCGv src1)
     tcg_gen_and_tl(t1, src1, mask);
     tcg_gen_shli_tl(t1, t1, 8);
     tcg_gen_or_tl(dest, t0, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
 }
 
 static void gen_revh_2w(TCGv dest, TCGv src1)
@@ -148,6 +154,9 @@ static void gen_revh_2w(TCGv dest, TCGv src1)
     tcg_gen_and_i64(t0, t0, mask);
     tcg_gen_shli_i64(t1, t1, 16);
     tcg_gen_or_i64(dest, t1, t0);
+
+    tcg_temp_free_i64(t0);
+    tcg_temp_free_i64(t1);
 }
 
 static void gen_revh_d(TCGv dest, TCGv src1)
@@ -162,6 +171,9 @@ static void gen_revh_d(TCGv dest, TCGv src1)
     tcg_gen_shli_tl(t0, t0, 16);
     tcg_gen_or_tl(t0, t0, t1);
     tcg_gen_rotri_tl(dest, t0, 32);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
 }
 
 static void gen_maskeqz(TCGv dest, TCGv src1, TCGv src2)

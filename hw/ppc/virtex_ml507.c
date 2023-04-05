@@ -157,7 +157,7 @@ static int xilinx_load_device_tree(MachineState *machine,
     int r;
     const char *dtb_filename;
 
-    dtb_filename = machine->dtb;
+    dtb_filename = current_machine->dtb;
     if (dtb_filename) {
         fdt = load_device_tree(dtb_filename, &fdt_size);
         if (!fdt) {

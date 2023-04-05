@@ -17,7 +17,7 @@
 from collections import OrderedDict
 import os
 import re
-from typing import List, Optional
+from typing import Optional
 
 from .common import (
     POINTER_SUFFIX,
@@ -29,7 +29,7 @@ from .common import (
 )
 from .error import QAPIError, QAPISemError, QAPISourceError
 from .expr import check_exprs
-from .parser import QAPIExpression, QAPISchemaParser
+from .parser import QAPISchemaParser
 
 
 class QAPISchemaIfCond:
@@ -253,11 +253,6 @@ class QAPISchemaType(QAPISchemaEntity):
             return None
         return self.name
 
-    def need_has_if_optional(self):
-        # When FOO is a pointer, has_FOO == !!FOO, i.e. has_FOO is redundant.
-        # Except for arrays; see QAPISchemaArrayType.need_has_if_optional().
-        return not self.c_type().endswith(POINTER_SUFFIX)
-
     def check(self, schema):
         QAPISchemaEntity.check(self, schema)
         for feat in self.features:
@@ -356,11 +351,6 @@ class QAPISchemaArrayType(QAPISchemaType):
         assert isinstance(element_type, str)
         self._element_type_name = element_type
         self.element_type = None
-
-    def need_has_if_optional(self):
-        # When FOO is an array, we still need has_FOO to distinguish
-        # absent (!has_FOO) from present and empty (has_FOO && !FOO).
-        return True
 
     def check(self, schema):
         super().check(schema)
@@ -755,10 +745,6 @@ class QAPISchemaObjectTypeMember(QAPISchemaMember):
         self.optional = optional
         self.features = features or []
 
-    def need_has(self):
-        assert self.type
-        return self.optional and self.type.need_has_if_optional()
-
     def check(self, schema):
         assert self.defined_in
         self.type = schema.resolve_type(self._type_name, self.info,
@@ -964,11 +950,10 @@ class QAPISchema:
         name = self._module_name(fname)
         return self._module_dict[name]
 
-    def _def_include(self, expr: QAPIExpression):
+    def _def_include(self, expr, info, doc):
         include = expr['include']
-        assert expr.doc is None
-        self._def_entity(
-            QAPISchemaInclude(self._make_module(include), expr.info))
+        assert doc is None
+        self._def_entity(QAPISchemaInclude(self._make_module(include), info))
 
     def _def_builtin_type(self, name, json_type, c_type):
         self._def_entity(QAPISchemaBuiltinType(name, json_type, c_type))
@@ -1046,15 +1031,14 @@ class QAPISchema:
                 name, info, None, ifcond, None, None, members, None))
         return name
 
-    def _def_enum_type(self, expr: QAPIExpression):
+    def _def_enum_type(self, expr, info, doc):
         name = expr['enum']
         data = expr['data']
         prefix = expr.get('prefix')
         ifcond = QAPISchemaIfCond(expr.get('if'))
-        info = expr.info
         features = self._make_features(expr.get('features'), info)
         self._def_entity(QAPISchemaEnumType(
-            name, info, expr.doc, ifcond, features,
+            name, info, doc, ifcond, features,
             self._make_enum_members(data, info), prefix))
 
     def _make_member(self, name, typ, ifcond, features, info):
@@ -1074,15 +1058,14 @@ class QAPISchema:
                                   value.get('features'), info)
                 for (key, value) in data.items()]
 
-    def _def_struct_type(self, expr: QAPIExpression):
+    def _def_struct_type(self, expr, info, doc):
         name = expr['struct']
         base = expr.get('base')
         data = expr['data']
-        info = expr.info
         ifcond = QAPISchemaIfCond(expr.get('if'))
         features = self._make_features(expr.get('features'), info)
         self._def_entity(QAPISchemaObjectType(
-            name, info, expr.doc, ifcond, features, base,
+            name, info, doc, ifcond, features, base,
             self._make_members(data, info),
             None))
 
@@ -1092,13 +1075,11 @@ class QAPISchema:
             typ = self._make_array_type(typ[0], info)
         return QAPISchemaVariant(case, info, typ, ifcond)
 
-    def _def_union_type(self, expr: QAPIExpression):
+    def _def_union_type(self, expr, info, doc):
         name = expr['union']
         base = expr['base']
         tag_name = expr['discriminator']
         data = expr['data']
-        assert isinstance(data, dict)
-        info = expr.info
         ifcond = QAPISchemaIfCond(expr.get('if'))
         features = self._make_features(expr.get('features'), info)
         if isinstance(base, dict):
@@ -1110,19 +1091,17 @@ class QAPISchema:
                                QAPISchemaIfCond(value.get('if')),
                                info)
             for (key, value) in data.items()]
-        members: List[QAPISchemaObjectTypeMember] = []
+        members = []
         self._def_entity(
-            QAPISchemaObjectType(name, info, expr.doc, ifcond, features,
+            QAPISchemaObjectType(name, info, doc, ifcond, features,
                                  base, members,
                                  QAPISchemaVariants(
                                      tag_name, info, None, variants)))
 
-    def _def_alternate_type(self, expr: QAPIExpression):
+    def _def_alternate_type(self, expr, info, doc):
         name = expr['alternate']
         data = expr['data']
-        assert isinstance(data, dict)
         ifcond = QAPISchemaIfCond(expr.get('if'))
-        info = expr.info
         features = self._make_features(expr.get('features'), info)
         variants = [
             self._make_variant(key, value['type'],
@@ -1131,11 +1110,11 @@ class QAPISchema:
             for (key, value) in data.items()]
         tag_member = QAPISchemaObjectTypeMember('type', info, 'QType', False)
         self._def_entity(
-            QAPISchemaAlternateType(
-                name, info, expr.doc, ifcond, features,
-                QAPISchemaVariants(None, info, tag_member, variants)))
+            QAPISchemaAlternateType(name, info, doc, ifcond, features,
+                                    QAPISchemaVariants(
+                                        None, info, tag_member, variants)))
 
-    def _def_command(self, expr: QAPIExpression):
+    def _def_command(self, expr, info, doc):
         name = expr['command']
         data = expr.get('data')
         rets = expr.get('returns')
@@ -1146,7 +1125,6 @@ class QAPISchema:
         allow_preconfig = expr.get('allow-preconfig', False)
         coroutine = expr.get('coroutine', False)
         ifcond = QAPISchemaIfCond(expr.get('if'))
-        info = expr.info
         features = self._make_features(expr.get('features'), info)
         if isinstance(data, OrderedDict):
             data = self._make_implicit_object_type(
@@ -1155,42 +1133,44 @@ class QAPISchema:
         if isinstance(rets, list):
             assert len(rets) == 1
             rets = self._make_array_type(rets[0], info)
-        self._def_entity(QAPISchemaCommand(name, info, expr.doc, ifcond,
-                                           features, data, rets,
+        self._def_entity(QAPISchemaCommand(name, info, doc, ifcond, features,
+                                           data, rets,
                                            gen, success_response,
                                            boxed, allow_oob, allow_preconfig,
                                            coroutine))
 
-    def _def_event(self, expr: QAPIExpression):
+    def _def_event(self, expr, info, doc):
         name = expr['event']
         data = expr.get('data')
         boxed = expr.get('boxed', False)
         ifcond = QAPISchemaIfCond(expr.get('if'))
-        info = expr.info
         features = self._make_features(expr.get('features'), info)
         if isinstance(data, OrderedDict):
             data = self._make_implicit_object_type(
                 name, info, ifcond,
                 'arg', self._make_members(data, info))
-        self._def_entity(QAPISchemaEvent(name, info, expr.doc, ifcond,
-                                         features, data, boxed))
+        self._def_entity(QAPISchemaEvent(name, info, doc, ifcond, features,
+                                         data, boxed))
 
     def _def_exprs(self, exprs):
-        for expr in exprs:
+        for expr_elem in exprs:
+            expr = expr_elem['expr']
+            info = expr_elem['info']
+            doc = expr_elem.get('doc')
             if 'enum' in expr:
-                self._def_enum_type(expr)
+                self._def_enum_type(expr, info, doc)
             elif 'struct' in expr:
-                self._def_struct_type(expr)
+                self._def_struct_type(expr, info, doc)
             elif 'union' in expr:
-                self._def_union_type(expr)
+                self._def_union_type(expr, info, doc)
             elif 'alternate' in expr:
-                self._def_alternate_type(expr)
+                self._def_alternate_type(expr, info, doc)
             elif 'command' in expr:
-                self._def_command(expr)
+                self._def_command(expr, info, doc)
             elif 'event' in expr:
-                self._def_event(expr)
+                self._def_event(expr, info, doc)
             elif 'include' in expr:
-                self._def_include(expr)
+                self._def_include(expr, info, doc)
             else:
                 assert False
 

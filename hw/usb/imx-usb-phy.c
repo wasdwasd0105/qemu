@@ -13,7 +13,6 @@
 #include "qemu/osdep.h"
 #include "hw/usb/imx-usb-phy.h"
 #include "migration/vmstate.h"
-#include "qemu/log.h"
 #include "qemu/module.h"
 
 static const VMStateDescription vmstate_imx_usbphy = {
@@ -91,15 +90,7 @@ static uint64_t imx_usbphy_read(void *opaque, hwaddr offset, unsigned size)
         value = s->usbphy[index - 3];
         break;
     default:
-        if (index < USBPHY_MAX) {
-            value = s->usbphy[index];
-        } else {
-            qemu_log_mask(LOG_GUEST_ERROR,
-                          "%s: Read from non-existing USB PHY register 0x%"
-                          HWADDR_PRIx "\n",
-                          __func__, offset);
-            value = 0;
-        }
+        value = s->usbphy[index];
         break;
     }
     return (uint64_t)value;
@@ -177,13 +168,7 @@ static void imx_usbphy_write(void *opaque, hwaddr offset, uint64_t value,
         s->usbphy[index - 3] ^= value;
         break;
     default:
-        /* Other registers are read-only or do not exist */
-        qemu_log_mask(LOG_GUEST_ERROR,
-                      "%s: Write to %s USB PHY register 0x%"
-                      HWADDR_PRIx "\n",
-                      __func__,
-                      index >= USBPHY_MAX ? "non-existing" : "read-only",
-                      offset);
+        /* Other registers are read-only */
         break;
     }
 }

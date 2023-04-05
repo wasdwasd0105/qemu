@@ -402,9 +402,6 @@ static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
                     ps2_put_keycode(s, 0xaa);
                 }
             }
-        } else if ((qcode == Q_KEY_CODE_LANG1 || qcode == Q_KEY_CODE_LANG2)
-                   && !key->down) {
-            /* Ignore release for these keys */
         } else {
             if (qcode < qemu_input_map_qcode_to_atset1_len) {
                 keycode = qemu_input_map_qcode_to_atset1[qcode];
@@ -500,9 +497,6 @@ static void ps2_keyboard_event(DeviceState *dev, QemuConsole *src,
                     ps2_put_keycode(s, 0x12);
                 }
             }
-        } else if ((qcode == Q_KEY_CODE_LANG1 || qcode == Q_KEY_CODE_LANG2) &&
-                   !key->down) {
-            /* Ignore release for these keys */
         } else {
             if (qcode < qemu_input_map_qcode_to_atset2_len) {
                 keycode = qemu_input_map_qcode_to_atset2[qcode];
@@ -1007,18 +1001,12 @@ void ps2_write_mouse(PS2MouseState *s, int val)
     }
 }
 
-static void ps2_reset_hold(Object *obj)
+static void ps2_reset(DeviceState *dev)
 {
-    PS2State *s = PS2_DEVICE(obj);
+    PS2State *s = PS2_DEVICE(dev);
 
     s->write_cmd = -1;
     ps2_reset_queue(s);
-}
-
-static void ps2_reset_exit(Object *obj)
-{
-    PS2State *s = PS2_DEVICE(obj);
-
     ps2_lower_irq(s);
 }
 
@@ -1048,16 +1036,13 @@ static void ps2_common_post_load(PS2State *s)
     q->cwptr = ccount ? (q->rptr + ccount) & (PS2_BUFFER_SIZE - 1) : -1;
 }
 
-static void ps2_kbd_reset_hold(Object *obj)
+static void ps2_kbd_reset(DeviceState *dev)
 {
-    PS2DeviceClass *ps2dc = PS2_DEVICE_GET_CLASS(obj);
-    PS2KbdState *s = PS2_KBD_DEVICE(obj);
+    PS2DeviceClass *ps2dc = PS2_DEVICE_GET_CLASS(dev);
+    PS2KbdState *s = PS2_KBD_DEVICE(dev);
 
     trace_ps2_kbd_reset(s);
-
-    if (ps2dc->parent_phases.hold) {
-        ps2dc->parent_phases.hold(obj);
-    }
+    ps2dc->parent_reset(dev);
 
     s->scan_enabled = 1;
     s->translate = 0;
@@ -1065,16 +1050,13 @@ static void ps2_kbd_reset_hold(Object *obj)
     s->modifiers = 0;
 }
 
-static void ps2_mouse_reset_hold(Object *obj)
+static void ps2_mouse_reset(DeviceState *dev)
 {
-    PS2DeviceClass *ps2dc = PS2_DEVICE_GET_CLASS(obj);
-    PS2MouseState *s = PS2_MOUSE_DEVICE(obj);
+    PS2DeviceClass *ps2dc = PS2_DEVICE_GET_CLASS(dev);
+    PS2MouseState *s = PS2_MOUSE_DEVICE(dev);
 
     trace_ps2_mouse_reset(s);
-
-    if (ps2dc->parent_phases.hold) {
-        ps2dc->parent_phases.hold(obj);
-    }
+    ps2dc->parent_reset(dev);
 
     s->mouse_status = 0;
     s->mouse_resolution = 0;
@@ -1257,12 +1239,10 @@ static void ps2_mouse_realize(DeviceState *dev, Error **errp)
 static void ps2_kbd_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    ResettableClass *rc = RESETTABLE_CLASS(klass);
     PS2DeviceClass *ps2dc = PS2_DEVICE_CLASS(klass);
 
     dc->realize = ps2_kbd_realize;
-    resettable_class_set_parent_phases(rc, NULL, ps2_kbd_reset_hold, NULL,
-                                       &ps2dc->parent_phases);
+    device_class_set_parent_reset(dc, ps2_kbd_reset, &ps2dc->parent_reset);
     dc->vmsd = &vmstate_ps2_keyboard;
 }
 
@@ -1276,12 +1256,11 @@ static const TypeInfo ps2_kbd_info = {
 static void ps2_mouse_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    ResettableClass *rc = RESETTABLE_CLASS(klass);
     PS2DeviceClass *ps2dc = PS2_DEVICE_CLASS(klass);
 
     dc->realize = ps2_mouse_realize;
-    resettable_class_set_parent_phases(rc, NULL, ps2_mouse_reset_hold, NULL,
-                                       &ps2dc->parent_phases);
+    device_class_set_parent_reset(dc, ps2_mouse_reset,
+                                  &ps2dc->parent_reset);
     dc->vmsd = &vmstate_ps2_mouse;
 }
 
@@ -1302,10 +1281,8 @@ static void ps2_init(Object *obj)
 static void ps2_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
-    ResettableClass *rc = RESETTABLE_CLASS(klass);
 
-    rc->phases.hold = ps2_reset_hold;
-    rc->phases.exit = ps2_reset_exit;
+    dc->reset = ps2_reset;
     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
 }
 

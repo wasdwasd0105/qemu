@@ -260,33 +260,6 @@ int monitor_printf(Monitor *mon, const char *fmt, ...)
     return ret;
 }
 
-void monitor_printc(Monitor *mon, int c)
-{
-    monitor_printf(mon, "'");
-    switch(c) {
-    case '\'':
-        monitor_printf(mon, "\\'");
-        break;
-    case '\\':
-        monitor_printf(mon, "\\\\");
-        break;
-    case '\n':
-        monitor_printf(mon, "\\n");
-        break;
-    case '\r':
-        monitor_printf(mon, "\\r");
-        break;
-    default:
-        if (c >= 32 && c <= 126) {
-            monitor_printf(mon, "%c", c);
-        } else {
-            monitor_printf(mon, "\\x%02x", c);
-        }
-        break;
-    }
-    monitor_printf(mon, "'");
-}
-
 /*
  * Print to current monitor if we have one, else to stderr.
  */
@@ -720,7 +693,7 @@ static void monitor_qapi_event_init(void)
                                                 qapi_event_throttle_equal);
 }
 
-void monitor_init_globals(void)
+void monitor_init_globals_core(void)
 {
     monitor_qapi_event_init();
     qemu_mutex_init(&monitor_lock);
@@ -738,8 +711,8 @@ void monitor_init_globals(void)
 
 int monitor_init(MonitorOptions *opts, bool allow_hmp, Error **errp)
 {
-    ERRP_GUARD();
     Chardev *chr;
+    Error *local_err = NULL;
 
     chr = qemu_chr_find(opts->chardev);
     if (chr == NULL) {
@@ -753,7 +726,7 @@ int monitor_init(MonitorOptions *opts, bool allow_hmp, Error **errp)
 
     switch (opts->mode) {
     case MONITOR_MODE_CONTROL:
-        monitor_init_qmp(chr, opts->pretty, errp);
+        monitor_init_qmp(chr, opts->pretty, &local_err);
         break;
     case MONITOR_MODE_READLINE:
         if (!allow_hmp) {
@@ -764,13 +737,17 @@ int monitor_init(MonitorOptions *opts, bool allow_hmp, Error **errp)
             error_setg(errp, "'pretty' is not compatible with HMP monitors");
             return -1;
         }
-        monitor_init_hmp(chr, true, errp);
+        monitor_init_hmp(chr, true, &local_err);
         break;
     default:
         g_assert_not_reached();
     }
 
-    return *errp ? -1 : 0;
+    if (local_err) {
+        error_propagate(errp, local_err);
+        return -1;
+    }
+    return 0;
 }
 
 int monitor_init_opts(QemuOpts *opts, Error **errp)

@@ -61,10 +61,7 @@ LINE_WIDTH = 76
 
 # Convert the default value of an option to the string used in
 # the help message
-def get_help(opt):
-    if opt["name"] == "libdir":
-        return 'system default'
-    value = opt["value"]
+def value_to_help(value):
     if isinstance(value, list):
         return ",".join(value)
     if isinstance(value, bool):
@@ -91,7 +88,7 @@ def sh_print(line=""):
 def help_line(left, opt, indent, long):
     right = f'{opt["description"]}'
     if long:
-        value = get_help(opt)
+        value = value_to_help(opt["value"])
         if value != "auto" and value != "":
             right += f" [{value}]"
     if "choices" in opt and long:

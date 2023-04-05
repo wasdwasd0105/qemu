@@ -10,8 +10,6 @@
 #ifndef PPC_XIVE2_REGS_H
 #define PPC_XIVE2_REGS_H
 
-#include "cpu.h"
-
 /*
  * Thread Interrupt Management Area (TIMA)
  *

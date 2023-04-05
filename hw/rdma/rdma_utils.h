@@ -18,6 +18,7 @@
 #define RDMA_UTILS_H
 
 #include "qemu/error-report.h"
+#include "hw/pci/pci.h"
 #include "sysemu/dma.h"
 
 #define rdma_error_report(fmt, ...) \

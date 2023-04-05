@@ -38,6 +38,8 @@
 #include "sysemu/sysemu.h"
 #include "exec/address-spaces.h"
 #include "hw/intc/ppc-uic.h"
+#include "hw/qdev-properties.h"
+#include "qapi/error.h"
 #include "trace.h"
 
 /*****************************************************************************/

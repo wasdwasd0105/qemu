@@ -13,6 +13,7 @@
 #include "sysemu/block-backend.h"
 #include "io/channel-tls.h"
 
+#include "qemu/coroutine.h"
 #include "qemu/iov.h"
 
 #ifndef _WIN32

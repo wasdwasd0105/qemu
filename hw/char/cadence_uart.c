@@ -450,15 +450,13 @@ static MemTxResult uart_write(void *opaque, hwaddr offset,
         }
         break;
     case R_BRGR: /* Baud rate generator */
-        value &= 0xffff;
         if (value >= 0x01) {
-            s->r[offset] = value;
+            s->r[offset] = value & 0xFFFF;
         }
         break;
     case R_BDIV:    /* Baud rate divider */
-        value &= 0xff;
         if (value >= 0x04) {
-            s->r[offset] = value;
+            s->r[offset] = value & 0xFF;
         }
         break;
     default:

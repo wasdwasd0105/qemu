@@ -24,7 +24,11 @@
 
 void hvf_handle_io(CPUArchState *, uint16_t, void *, int, int, int);
 
+#ifdef NEED_CPU_H
+/* Functions exported to host specific mode */
+
 /* Host specific functions */
 int hvf_inject_interrupt(CPUArchState *env, int vector);
+#endif
 
 #endif

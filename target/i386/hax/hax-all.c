@@ -357,9 +357,6 @@ static int hax_accel_init(MachineState *ms)
         fprintf(stdout, "HAX is %s and emulator runs in %s mode.\n",
                 !ret ? "working" : "not working",
                 !ret ? "fast virt" : "emulation");
-        fprintf(stdout,
-                "NOTE: HAX is deprecated and will be removed in a future release.\n"
-                "      Use 'whpx' (on Windows) or 'hvf' (on macOS) instead.\n");
     }
     return ret;
 }
@@ -391,7 +388,7 @@ static int hax_handle_io(CPUArchState *env, uint32_t df, uint16_t port,
     MemTxAttrs attrs = { 0 };
 
     if (!df) {
-        ptr = buffer;
+        ptr = (uint8_t *) buffer;
     } else {
         ptr = buffer + size * count - size;
     }

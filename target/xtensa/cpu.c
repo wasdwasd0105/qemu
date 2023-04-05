@@ -35,9 +35,6 @@
 #include "qemu/module.h"
 #include "migration/vmstate.h"
 #include "hw/qdev-clock.h"
-#ifndef CONFIG_USER_ONLY
-#include "exec/memory.h"
-#endif
 
 
 static void xtensa_cpu_set_pc(CPUState *cs, vaddr value)
@@ -88,18 +85,16 @@ bool xtensa_abi_call0(void)
 }
 #endif
 
-static void xtensa_cpu_reset_hold(Object *obj)
+static void xtensa_cpu_reset(DeviceState *dev)
 {
-    CPUState *s = CPU(obj);
+    CPUState *s = CPU(dev);
     XtensaCPU *cpu = XTENSA_CPU(s);
     XtensaCPUClass *xcc = XTENSA_CPU_GET_CLASS(cpu);
     CPUXtensaState *env = &cpu->env;
     bool dfpu = xtensa_option_enabled(env->config,
                                       XTENSA_OPTION_DFP_COPROCESSOR);
 
-    if (xcc->parent_phases.hold) {
-        xcc->parent_phases.hold(obj);
-    }
+    xcc->parent_reset(dev);
 
     env->pc = env->config->exception_vector[EXC_RESET0 + env->static_vectors];
     env->sregs[LITBASE] &= ~1;
@@ -245,13 +240,11 @@ static void xtensa_cpu_class_init(ObjectClass *oc, void *data)
     DeviceClass *dc = DEVICE_CLASS(oc);
     CPUClass *cc = CPU_CLASS(oc);
     XtensaCPUClass *xcc = XTENSA_CPU_CLASS(cc);
-    ResettableClass *rc = RESETTABLE_CLASS(oc);
 
     device_class_set_parent_realize(dc, xtensa_cpu_realizefn,
                                     &xcc->parent_realize);
 
-    resettable_class_set_parent_phases(rc, NULL, xtensa_cpu_reset_hold, NULL,
-                                       &xcc->parent_phases);
+    device_class_set_parent_reset(dc, xtensa_cpu_reset, &xcc->parent_reset);
 
     cc->class_by_name = xtensa_cpu_class_by_name;
     cc->has_work = xtensa_cpu_has_work;

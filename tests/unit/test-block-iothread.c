@@ -24,7 +24,6 @@
 
 #include "qemu/osdep.h"
 #include "block/block.h"
-#include "block/block_int-global-state.h"
 #include "block/blockjob_int.h"
 #include "sysemu/block-backend.h"
 #include "qapi/error.h"
@@ -312,8 +311,7 @@ static void test_sync_op_blk_truncate(BlockBackend *blk)
     g_assert_cmpint(ret, ==, -EINVAL);
 }
 
-/* Disable TSA to make bdrv_test.bdrv_co_block_status writable */
-static void TSA_NO_TSA test_sync_op_block_status(BdrvChild *c)
+static void test_sync_op_block_status(BdrvChild *c)
 {
     int ret;
     int64_t n;
@@ -833,10 +831,7 @@ static void test_attach_second_node(void)
     qdict_put_str(options, "driver", "raw");
     qdict_put_str(options, "file", "base");
 
-    aio_context_acquire(ctx);
     filter = bdrv_open(NULL, NULL, options, BDRV_O_RDWR, &error_abort);
-    aio_context_release(ctx);
-
     g_assert(blk_get_aio_context(blk) == ctx);
     g_assert(bdrv_get_aio_context(bs) == ctx);
     g_assert(bdrv_get_aio_context(filter) == ctx);

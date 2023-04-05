@@ -20,8 +20,7 @@
 #ifndef PPC_PNV_XSCOM_H
 #define PPC_PNV_XSCOM_H
 
-#include "exec/memory.h"
-#include "hw/ppc/pnv.h"
+#include "qom/object.h"
 
 typedef struct PnvXScomInterface PnvXScomInterface;
 

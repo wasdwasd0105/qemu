@@ -31,6 +31,10 @@
 #include "qemu/sys_membarrier.h"
 #include "qemu/coroutine-tls.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Important !
  *
@@ -191,5 +195,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(RCUReadAuto, rcu_read_auto_unlock)
  */
 void rcu_add_force_rcu_notifier(Notifier *n);
 void rcu_remove_force_rcu_notifier(Notifier *n);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* QEMU_RCU_H */

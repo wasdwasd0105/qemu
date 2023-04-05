@@ -185,39 +185,22 @@ int i2c_start_transfer(I2CBus *bus, uint8_t address, bool is_recv)
 
 void i2c_bus_master(I2CBus *bus, QEMUBH *bh)
 {
-    I2CPendingMaster *node = g_new(struct I2CPendingMaster, 1);
-    node->bh = bh;
-
-    QSIMPLEQ_INSERT_TAIL(&bus->pending_masters, node, entry);
-}
-
-void i2c_schedule_pending_master(I2CBus *bus)
-{
-    I2CPendingMaster *node;
-
     if (i2c_bus_busy(bus)) {
-        /* someone is already controlling the bus; wait for it to release it */
+        I2CPendingMaster *node = g_new(struct I2CPendingMaster, 1);
+        node->bh = bh;
+
+        QSIMPLEQ_INSERT_TAIL(&bus->pending_masters, node, entry);
+
         return;
     }
 
-    if (QSIMPLEQ_EMPTY(&bus->pending_masters)) {
-        return;
-    }
-
-    node = QSIMPLEQ_FIRST(&bus->pending_masters);
-    bus->bh = node->bh;
-
-    QSIMPLEQ_REMOVE_HEAD(&bus->pending_masters, entry);
-    g_free(node);
-
+    bus->bh = bh;
     qemu_bh_schedule(bus->bh);
 }
 
 void i2c_bus_release(I2CBus *bus)
 {
     bus->bh = NULL;
-
-    i2c_schedule_pending_master(bus);
 }
 
 int i2c_start_recv(I2CBus *bus, uint8_t address)
@@ -251,6 +234,16 @@ void i2c_end_transfer(I2CBus *bus)
         g_free(node);
     }
     bus->broadcast = false;
+
+    if (!QSIMPLEQ_EMPTY(&bus->pending_masters)) {
+        I2CPendingMaster *node = QSIMPLEQ_FIRST(&bus->pending_masters);
+        bus->bh = node->bh;
+
+        QSIMPLEQ_REMOVE_HEAD(&bus->pending_masters, entry);
+        g_free(node);
+
+        qemu_bh_schedule(bus->bh);
+    }
 }
 
 int i2c_send(I2CBus *bus, uint8_t data)

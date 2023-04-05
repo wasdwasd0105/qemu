@@ -29,7 +29,6 @@
 
 #include "qapi/qapi-visit-sockets.h"
 #include "qapi/clone-visitor.h"
-#include "qemu/coroutine.h"
 
 struct NBDClientConnection {
     /* Initialization constants, never change */

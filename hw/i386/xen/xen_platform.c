@@ -25,23 +25,18 @@
 
 #include "qemu/osdep.h"
 #include "qapi/error.h"
+#include "hw/ide.h"
 #include "hw/ide/pci.h"
 #include "hw/pci/pci.h"
+#include "hw/xen/xen_common.h"
 #include "migration/vmstate.h"
-#include "net/net.h"
+#include "hw/xen/xen-legacy-backend.h"
 #include "trace.h"
 #include "sysemu/xen.h"
 #include "sysemu/block-backend.h"
 #include "qemu/error-report.h"
 #include "qemu/module.h"
 #include "qom/object.h"
-
-#ifdef CONFIG_XEN
-#include "hw/xen/xen_native.h"
-#endif
-
-/* The rule is that xen_native.h must come first */
-#include "hw/xen/xen.h"
 
 //#define DEBUG_PLATFORM
 
@@ -114,25 +109,12 @@ static void log_writeb(PCIXenPlatformState *s, char val)
 #define _UNPLUG_NVME_DISKS 3
 #define UNPLUG_NVME_DISKS (1u << _UNPLUG_NVME_DISKS)
 
-static bool pci_device_is_passthrough(PCIDevice *d)
-{
-    if (!strcmp(d->name, "xen-pci-passthrough")) {
-        return true;
-    }
-
-    if (xen_mode == XEN_EMULATE && !strcmp(d->name, "vfio-pci")) {
-        return true;
-    }
-
-    return false;
-}
-
 static void unplug_nic(PCIBus *b, PCIDevice *d, void *o)
 {
     /* We have to ignore passthrough devices */
     if (pci_get_word(d->config + PCI_CLASS_DEVICE) ==
             PCI_CLASS_NETWORK_ETHERNET
-            && !pci_device_is_passthrough(d)) {
+            && strcmp(d->name, "xen-pci-passthrough") != 0) {
         object_unparent(OBJECT(d));
     }
 }
@@ -195,7 +177,7 @@ static void pci_xen_ide_unplug(DeviceState *dev, bool aux)
             blk_unref(blk);
         }
     }
-    device_cold_reset(dev);
+    qdev_reset_all(dev);
 }
 
 static void unplug_disks(PCIBus *b, PCIDevice *d, void *opaque)
@@ -205,8 +187,9 @@ static void unplug_disks(PCIBus *b, PCIDevice *d, void *opaque)
         !(flags & UNPLUG_IDE_SCSI_DISKS);
 
     /* We have to ignore passthrough devices */
-    if (pci_device_is_passthrough(d))
+    if (!strcmp(d->name, "xen-pci-passthrough")) {
         return;
+    }
 
     switch (pci_get_word(d->config + PCI_CLASS_DEVICE)) {
     case PCI_CLASS_STORAGE_IDE:
@@ -285,26 +268,18 @@ static void platform_fixed_ioport_writeb(void *opaque, uint32_t addr, uint32_t v
     PCIXenPlatformState *s = opaque;
 
     switch (addr) {
-    case 0: /* Platform flags */
-        if (xen_mode == XEN_EMULATE) {
-            /* XX: Use i440gx/q35 PAM setup to do this? */
-            s->flags = val & PFFLAG_ROM_LOCK;
-#ifdef CONFIG_XEN
+    case 0: /* Platform flags */ {
+        hvmmem_type_t mem_type = (val & PFFLAG_ROM_LOCK) ?
+            HVMMEM_ram_ro : HVMMEM_ram_rw;
+        if (xen_set_mem_type(xen_domid, mem_type, 0xc0, 0x40)) {
+            DPRINTF("unable to change ro/rw state of ROM memory area!\n");
         } else {
-            hvmmem_type_t mem_type = (val & PFFLAG_ROM_LOCK) ?
-                HVMMEM_ram_ro : HVMMEM_ram_rw;
-
-            if (xen_set_mem_type(xen_domid, mem_type, 0xc0, 0x40)) {
-                DPRINTF("unable to change ro/rw state of ROM memory area!\n");
-            } else {
-                s->flags = val & PFFLAG_ROM_LOCK;
-                DPRINTF("changed ro/rw state of ROM memory area. now is %s state.\n",
-                        (mem_type == HVMMEM_ram_ro ? "ro" : "rw"));
-            }
-#endif
+            s->flags = val & PFFLAG_ROM_LOCK;
+            DPRINTF("changed ro/rw state of ROM memory area. now is %s state.\n",
+                    (mem_type == HVMMEM_ram_ro ? "ro":"rw"));
         }
         break;
-
+    }
     case 2:
         log_writeb(s, val);
         break;
@@ -470,7 +445,7 @@ static uint64_t platform_mmio_read(void *opaque, hwaddr addr,
                                    unsigned size)
 {
     DPRINTF("Warning: attempted read from physical address "
-            "0x" HWADDR_FMT_plx " in xen platform mmio space\n", addr);
+            "0x" TARGET_FMT_plx " in xen platform mmio space\n", addr);
 
     return 0;
 }
@@ -479,7 +454,7 @@ static void platform_mmio_write(void *opaque, hwaddr addr,
                                 uint64_t val, unsigned size)
 {
     DPRINTF("Warning: attempted write of 0x%"PRIx64" to physical "
-            "address 0x" HWADDR_FMT_plx " in xen platform mmio space\n",
+            "address 0x" TARGET_FMT_plx " in xen platform mmio space\n",
             val, addr);
 }
 
@@ -522,8 +497,8 @@ static void xen_platform_realize(PCIDevice *dev, Error **errp)
     uint8_t *pci_conf;
 
     /* Device will crash on reset if xen is not initialized */
-    if (xen_mode == XEN_DISABLED) {
-        error_setg(errp, "xen-platform device requires a Xen guest");
+    if (!xen_enabled()) {
+        error_setg(errp, "xen-platform device requires the Xen accelerator");
         return;
     }
 

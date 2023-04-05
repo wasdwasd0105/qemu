@@ -6,6 +6,7 @@
 #include "exec/memory.h"
 #include "sysemu/hostmem.h"
 #include "sysemu/blockdev.h"
+#include "qemu/accel.h"
 #include "qapi/qapi-types-machine.h"
 #include "qemu/module.h"
 #include "qom/object.h"
@@ -129,14 +130,11 @@ typedef struct {
  * @prefer_sockets - whether sockets are preferred over cores in smp parsing
  * @dies_supported - whether dies are supported by the machine
  * @clusters_supported - whether clusters are supported by the machine
- * @has_clusters - whether clusters are explicitly specified in the user
- *                 provided SMP configuration
  */
 typedef struct {
     bool prefer_sockets;
     bool dies_supported;
     bool clusters_supported;
-    bool has_clusters;
 } SMPCompatProps;
 
 /**
@@ -380,9 +378,6 @@ struct MachineState {
         type_register_static(&machine_initfn##_typeinfo); \
     } \
     type_init(machine_initfn##_register_types)
-
-extern GlobalProperty hw_compat_7_2[];
-extern const size_t hw_compat_7_2_len;
 
 extern GlobalProperty hw_compat_7_1[];
 extern const size_t hw_compat_7_1_len;

@@ -43,8 +43,10 @@ static SemihostingConsole console;
 static int console_can_read(void *opaque)
 {
     SemihostingConsole *c = opaque;
+    int ret;
     g_assert(qemu_mutex_iothread_locked());
-    return (int)fifo8_num_free(&c->fifo);
+    ret = (int) fifo8_num_free(&c->fifo);
+    return ret;
 }
 
 static void console_wake_up(gpointer data, gpointer user_data)

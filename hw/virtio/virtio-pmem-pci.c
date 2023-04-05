@@ -70,6 +70,7 @@ static void virtio_pmem_pci_fill_device_info(const MemoryDeviceState *md,
     DeviceState *dev = DEVICE(md);
 
     if (dev->id) {
+        vi->has_id = true;
         vi->id = g_strdup(dev->id);
     }
 
